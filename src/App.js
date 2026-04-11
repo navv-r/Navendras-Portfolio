@@ -15,8 +15,7 @@ const EJS_PUBLIC_KEY  = 'VwH5xvKzzdxR_BhUd';
 const PROJECTS = [
   {
     title: 'Summarist Internship',
-    desc: 'Description coming soon.',
-    tags: ['React', 'Next.js', 'TypeScript'],
+    desc: 'A Next.js audiobook platform with user authentication, book browsing, personal collections, in-app audio playback, and a premium subscription tier.',
     color: '#2dc96e',
     label: 'Summarist',
     link: 'https://advanced-tech-internship.vercel.app/',
@@ -24,8 +23,7 @@ const PROJECTS = [
   },
   {
     title: 'NFT Marketplace Internship',
-    desc: 'Description coming soon.',
-    tags: ['React', 'Solidity', 'Web3'],
+    desc: 'A React-based NFT auction platform where users can browse trending and personalised listings, place bids, and track live countdown timers showing each NFT\'s remaining availability.',
     color: '#7c5cbf',
     label: 'NFT Market',
     link: 'https://navendra-internship.vercel.app/',
@@ -33,8 +31,7 @@ const PROJECTS = [
   },
   {
     title: 'Movie Finder Clone Project',
-    desc: 'Description coming soon.',
-    tags: ['React', 'REST API', 'CSS'],
+    desc: 'A vanilla JavaScript movie search app that lets users find any film by title or keyword, with a sorting dropdown for quick and easy browsing.',
     color: '#9e9e9e',
     label: 'Movie Finder',
     link: 'https://react-final-project-ruddy-five.vercel.app/',
@@ -42,8 +39,7 @@ const PROJECTS = [
   },
   {
     title: 'Skinstric Internship',
-    desc: 'Description coming soon.',
-    tags: ['React', 'JavaScript', 'CSS'],
+    desc: 'An AI-powered skincare platform built in React with Tailwind CSS. Users capture or upload a photo and receive demographic, gender, and age analysis via an AI endpoint API.',
     color: '#c8c8c8',
     label: 'Skinstric',
     link: 'https://skinstric-internship-pi.vercel.app',
@@ -292,11 +288,48 @@ function useScrollReveal() {
   }, []);
 }
 
+/* ── CountUp ── */
+function CountUp({ target, duration }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef(null);
+  const started = useRef(false);
+  const ms = duration ?? Math.max(600, Math.min(target * 6, 1800));
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !started.current) {
+        started.current = true;
+        const start = performance.now();
+        const tick = (now) => {
+          const p = Math.min((now - start) / ms, 1);
+          const ease = 1 - Math.pow(1 - p, 3);
+          setCount(Math.floor(ease * target));
+          if (p < 1) requestAnimationFrame(tick);
+          else setCount(target);
+        };
+        requestAnimationFrame(tick);
+      }
+    }, { threshold: 0.5 });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [target, ms]);
+
+  return <span ref={ref}>{count}+</span>;
+}
+
 /* ── App ── */
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const [dir, setDir] = useState('right');
+  const [commitCount, setCommitCount] = useState(null);
+
+  useEffect(() => {
+    fetch('/stats.json')
+      .then(r => r.json())
+      .then(data => setCommitCount(data.commits))
+      .catch(() => {});
+  }, []);
 
   // Contact form
   const formRef = useRef(null);
@@ -414,22 +447,57 @@ function App() {
       <section className="section" id="about">
         <h2 className="section-title reveal">About Me</h2>
         <div className="about-grid reveal" style={{ transitionDelay: '0.12s' }}>
-          <div className="about-avatar">NR</div>
-          <div className="about-text">
-            <p>
-              Hi, I'm Nav, a junior front-end developer based in Queens, NY, passionate about
-              building cool, interactive web experiences. I love bringing creative ideas to life
-              through code, crafting websites that are as engaging as they are functional.
-            </p>
-            <p>
-              When I'm not at my keyboard, you'll find me making music. I play the Dholak and
-              Tassa, two instruments deeply rooted in my cultural and religious heritage and I
-              bring that same rhythm and creativity to everything I build.
-            </p>
+          <div className="about-avatar">
+            <img src="/profile.jpeg" alt="Navendra Ramdhan" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
+          </div>
+          <div className="about-terminal">
+            <div className="terminal-bar">
+              <span className="t-dot t-dot--r" />
+              <span className="t-dot t-dot--y" />
+              <span className="t-dot t-dot--g" />
+              <span className="terminal-bar-title">nav@portfolio:~/about</span>
+            </div>
+            <div className="terminal-body">
+              <div className="t-line t-line--1">
+                <span className="t-prompt">$</span>
+                <span className="t-cmd">whoami</span>
+              </div>
+              <div className="t-output t-line--2">
+                Front-end developer based in Queens, NY — passionate about building cool, interactive web experiences and bringing creative ideas to life through code.
+              </div>
+              <div className="t-line t-line--3">
+                <span className="t-prompt">$</span>
+                <span className="t-cmd">cat interests.txt</span>
+              </div>
+              <div className="t-output t-line--4">
+                Musician at heart — I play Dholak and Tassa, instruments rooted in my cultural heritage. That same rhythm and creativity drives everything I build.
+              </div>
+              <div className="t-line t-line--5">
+                <span className="t-prompt">$</span>
+                <span className="t-cmd">cat passion.txt</span>
+              </div>
+              <div className="t-output t-line--6">
+                Deeply passionate about crafting seamless web experiences and pushing boundaries with AI integration — whether that's smart interfaces, generative features, or tools that make users feel like they're living in the future.
+              </div>
+              <div className="t-line t-line--7">
+                <span className="t-cursor" />
+              </div>
+            </div>
             <div className="about-stats">
-              <div className="stat"><span className="stat-num">1+</span><span>Years Exp.</span></div>
-              <div className="stat"><span className="stat-num">5+</span><span>Projects</span></div>
-              <div className="stat"><span className="stat-num">220+</span><span>Commits Pushed</span></div>
+              <div className="stat">
+                <span className="stat-num"><CountUp target={1} /></span>
+                <span>Years Exp.</span>
+              </div>
+              <div className="stat">
+                <span className="stat-num"><CountUp target={5} /></span>
+                <span>Projects</span>
+              </div>
+              <div className="stat">
+                <span className="stat-num">
+                  {commitCount !== null ? <CountUp target={commitCount} /> : '...'}
+                </span>
+                <span>Commits Pushed</span>
+              </div>
             </div>
           </div>
         </div>
@@ -475,7 +543,7 @@ function App() {
 
           {/* Track */}
           <div className="carousel-track" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-            {PROJECTS.map(({ title, desc, tags, color, label, link, image }, i) => {
+            {PROJECTS.map(({ title, desc, color, label, link, image }, i) => {
               const slot = getSlot(i);
               return (
                 <div
@@ -512,13 +580,7 @@ function App() {
                   <div className="project-body" style={{ borderTop: `2px solid ${color}55` }}>
                     <h3 style={{ color }}>{title}</h3>
                     <p>{desc}</p>
-                    <div className="project-tags">
-                      {tags.map(tag => (
-                        <span key={tag} className="tag" style={{ borderColor: `${color}66`, color }}>
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
+
                     {slot === 'center' && link && (
                       <a
                         href={link}
