@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import emailjs from '@emailjs/browser';
 import {
   SiHtml5, SiCss, SiJavascript, SiTypescript,
@@ -317,11 +317,361 @@ function CountUp({ target, duration }) {
   return <span ref={ref}>{count}+</span>;
 }
 
+/* ── Sci-Fi Theme Transition ── */
+const ANIM_DURATION = 1400;
+const MATRIX_CHARS = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホ@#$%&[]<>|/\\'.split('');
+
+function easeOutCubicFn(t) { return 1 - Math.pow(1 - t, 3); }
+function easeInCubicFn(t)  { return t * t * t; }
+
+function SciFiTransition({ mode, onThemeChange, onComplete }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const W = (canvas.width  = window.innerWidth);
+    const H = (canvas.height = window.innerHeight);
+
+    // Toggle button center (fixed bottom-right 24px, 48×48)
+    const OX = W - 48;
+    const OY = H - 48;
+    const MAX_R = Math.hypot(W, H) * 1.08;
+
+    // Matrix rain (to-dark)
+    const CS  = Math.max(13, Math.min(18, W / 55));
+    const COLS = Math.ceil(W / CS);
+    const drops = Array.from({ length: COLS }, () => -(Math.random() * H));
+
+    // Burst particles (both modes)
+    const BURST = Array.from({ length: 70 }, () => ({
+      angle: Math.random() * Math.PI * 2,
+      speed: 80 + Math.random() * 500,
+      r    : 1.2 + Math.random() * 2.8,
+      hue  : mode === 'to-dark'
+        ? 230 + Math.random() * 50
+        : 170 + Math.random() * 70,
+    }));
+
+    // Scan lines (to-light)
+    const SCANS = Array.from({ length: 6 }, (_, i) => ({
+      offset: i / 6,
+      speed : 0.6 + Math.random() * 0.5,
+    }));
+
+    // Glitch bars (to-dark)
+    const GLITCH = Array.from({ length: 8 }, () => ({
+      y     : Math.random() * H,
+      w     : 60 + Math.random() * 260,
+      x     : Math.random() * W,
+      startT: 0.05 + Math.random() * 0.35,
+      dur   : 0.06 + Math.random() * 0.1,
+    }));
+
+    let t0 = null;
+    let themeFlipped = false;
+    let rafId;
+
+    const frame = (ts) => {
+      if (!t0) t0 = ts;
+      const t = Math.min((ts - t0) / ANIM_DURATION, 1);
+
+      if (!themeFlipped && t >= 0.42) { themeFlipped = true; onThemeChange(); }
+
+      ctx.clearRect(0, 0, W, H);
+
+      const expandT  = Math.min(t / 0.60, 1);
+      const r        = MAX_R * easeOutCubicFn(expandT);
+      const fadeT    = t > 0.72 ? (t - 0.72) / 0.28 : 0;
+      ctx.globalAlpha = Math.max(0, 1 - easeInCubicFn(fadeT));
+
+      /* ── shared: burst particles ── */
+      const burstT = Math.min(t / 0.5, 1);
+      for (const p of BURST) {
+        const dist = p.speed * easeOutCubicFn(burstT);
+        const px = OX + Math.cos(p.angle) * dist;
+        const py = OY + Math.sin(p.angle) * dist;
+        const a  = (1 - burstT) * 0.85;
+        if (a <= 0.01) continue;
+        ctx.beginPath();
+        ctx.arc(px, py, p.r * (1 - burstT * 0.5), 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${p.hue},78%,65%,${a})`;
+        ctx.shadowColor = `hsl(${p.hue},78%,65%)`;
+        ctx.shadowBlur  = 8;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      if (mode === 'to-dark') {
+        /* ══════════════ VOID COLLAPSE ══════════════ */
+
+        // Dark expanding circle with contents
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(OX, OY, r, 0, Math.PI * 2);
+        ctx.clip();
+
+        ctx.fillStyle = '#0a0a0f';
+        ctx.fillRect(0, 0, W, H);
+
+        // Subtle hex grid
+        const HS = 38;
+        ctx.strokeStyle = 'rgba(108,99,255,0.13)';
+        ctx.lineWidth = 0.6;
+        for (let row = -1; row * HS * 1.5 < H + HS; row++) {
+          for (let col = -1; col * HS * 1.73 < W + HS; col++) {
+            const hx = col * HS * 1.73 + (row % 2 === 0 ? 0 : HS * 0.865);
+            const hy = row * HS * 1.5;
+            if (Math.hypot(hx - OX, hy - OY) > r + HS) continue;
+            ctx.beginPath();
+            for (let k = 0; k < 6; k++) {
+              const a = (Math.PI / 3) * k - Math.PI / 6;
+              k === 0
+                ? ctx.moveTo(hx + HS * 0.48 * Math.cos(a), hy + HS * 0.48 * Math.sin(a))
+                : ctx.lineTo(hx + HS * 0.48 * Math.cos(a), hy + HS * 0.48 * Math.sin(a));
+            }
+            ctx.closePath();
+            ctx.stroke();
+          }
+        }
+
+        // Matrix rain
+        ctx.font = `${CS}px "JetBrains Mono",monospace`;
+        for (let i = 0; i < COLS; i++) {
+          const cx2 = i * CS;
+          for (let j = 0; j < 18; j++) {
+            const cy2 = drops[i] - j * CS;
+            if (cy2 < -CS || cy2 > H) continue;
+            // rough circle clip check
+            if (Math.hypot(cx2 - OX, cy2 - OY) > r) continue;
+            const char  = MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
+            const alpha = (1 - j / 18) * Math.min(t * 2.5, 1) * 0.85;
+            ctx.fillStyle = j === 0
+              ? `rgba(220,210,255,${alpha})`
+              : j < 4
+              ? `rgba(162,155,254,${alpha})`
+              : `rgba(108,99,255,${alpha * 0.65})`;
+            ctx.fillText(char, cx2, cy2);
+          }
+          drops[i] += CS * 0.45;
+          if (drops[i] > H + CS * 12) drops[i] = -(CS * (4 + Math.random() * 8));
+        }
+
+        // Glitch horizontal bars
+        for (const g of GLITCH) {
+          if (t > g.startT && t < g.startT + g.dur) {
+            const lt = (t - g.startT) / g.dur;
+            ctx.fillStyle = `rgba(108,99,255,${0.55 * Math.sin(lt * Math.PI)})`;
+            ctx.fillRect(g.x, g.y, g.w, 2);
+            ctx.fillStyle = `rgba(0,184,148,${0.35 * Math.sin(lt * Math.PI)})`;
+            ctx.fillRect(g.x + 8, g.y + 2, g.w * 0.6, 1);
+          }
+        }
+
+        // Constellation dots inside void
+        const numDots = Math.floor(80 * Math.min(t * 3, 1));
+        for (let d = 0; d < numDots; d++) {
+          const seed = d * 137.508;
+          const dx = (Math.sin(seed * 0.7) * 0.5 + 0.5) * W;
+          const dy = (Math.cos(seed * 0.3) * 0.5 + 0.5) * H;
+          if (Math.hypot(dx - OX, dy - OY) > r * 0.92) continue;
+          const twinkle = 0.3 + 0.7 * Math.abs(Math.sin(ts * 0.003 + d));
+          ctx.beginPath();
+          ctx.arc(dx, dy, 0.8 + (d % 3) * 0.4, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(200,190,255,${twinkle * 0.7})`;
+          ctx.fill();
+        }
+
+        ctx.restore();
+
+        // Neon ring at boundary edge
+        if (expandT < 1) {
+          const rw  = Math.min(55, r * 0.12);
+          const gr  = ctx.createRadialGradient(OX, OY, r - rw, OX, OY, r + 12);
+          const iA  = 0.65 * (1 - expandT * 0.7);
+          gr.addColorStop(0,   'rgba(108,99,255,0)');
+          gr.addColorStop(0.35,`rgba(108,99,255,${iA})`);
+          gr.addColorStop(0.7, `rgba(162,155,254,${iA * 1.3})`);
+          gr.addColorStop(1,   'rgba(108,99,255,0)');
+          ctx.beginPath();
+          ctx.arc(OX, OY, r, 0, Math.PI * 2);
+          ctx.strokeStyle = gr;
+          ctx.lineWidth   = rw + 10;
+          ctx.stroke();
+
+          // Secondary outer electric arc ring
+          ctx.beginPath();
+          ctx.arc(OX, OY, r + 18, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(0,184,148,${0.3 * (1 - expandT)})`;
+          ctx.lineWidth   = 2;
+          ctx.setLineDash([6, 14]);
+          ctx.lineDashOffset = -ts * 0.12;
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Outside glitch scanlines
+        if (expandT < 0.95) {
+          const ng = Math.floor(6 * t);
+          for (let g = 0; g < ng; g++) {
+            const gy = (H * (g + 1)) / (ng + 1) + Math.sin(ts * 0.02 + g) * 12;
+            ctx.fillStyle = `rgba(108,99,255,${0.12 * Math.random()})`;
+            ctx.fillRect(Math.sin(ts * 0.01 + g) * 30, gy, W * (0.1 + 0.4 * Math.random()), 1.5);
+          }
+        }
+
+      } else {
+        /* ══════════════ PHOTON SURGE ══════════════ */
+
+        // Bright expanding circle
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(OX, OY, r, 0, Math.PI * 2);
+        ctx.clip();
+
+        ctx.fillStyle = '#f5f5f8';
+        ctx.fillRect(0, 0, W, H);
+
+        // Grid lines
+        const GS = 44;
+        ctx.strokeStyle = 'rgba(108,99,255,0.07)';
+        ctx.lineWidth   = 0.6;
+        for (let gx = 0; gx < W; gx += GS) {
+          ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+        }
+        for (let gy = 0; gy < H; gy += GS) {
+          ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+        }
+
+        // Sweeping scan lines
+        for (const sc of SCANS) {
+          const sy  = ((t * sc.speed + sc.offset) % 1) * H;
+          const sg  = ctx.createLinearGradient(0, sy - 35, 0, sy + 35);
+          const sA  = 0.22 * (1 - fadeT);
+          sg.addColorStop(0,   'rgba(108,99,255,0)');
+          sg.addColorStop(0.45,`rgba(108,99,255,${sA})`);
+          sg.addColorStop(0.5, `rgba(162,155,254,${sA * 1.4})`);
+          sg.addColorStop(0.55,`rgba(108,99,255,${sA})`);
+          sg.addColorStop(1,   'rgba(108,99,255,0)');
+          ctx.fillStyle = sg;
+          ctx.fillRect(0, sy - 35, W, 70);
+        }
+
+        // Light data particles
+        const numLP = Math.floor(50 * Math.min(t * 2.5, 1));
+        for (let d = 0; d < numLP; d++) {
+          const seed = d * 113.7;
+          const lx   = (Math.sin(seed * 0.5 + ts * 0.001) * 0.5 + 0.5) * W;
+          const ly   = (Math.cos(seed * 0.8) * 0.5 + 0.5) * H - (t * 80);
+          if (Math.hypot(lx - OX, ly - OY) > r * 0.95) continue;
+          ctx.beginPath();
+          ctx.arc(lx, ly, 1 + (d % 3) * 0.6, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(108,99,255,${0.4 + 0.4 * Math.abs(Math.sin(ts * 0.004 + d))})`;
+          ctx.shadowColor = '#6c63ff';
+          ctx.shadowBlur  = 6;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+
+        ctx.restore();
+
+        // Lens flare rays from origin
+        if (expandT < 0.9) {
+          const numRays = 20;
+          for (let i = 0; i < numRays; i++) {
+            const angle   = (i / numRays) * Math.PI * 2 + ts * 0.0005;
+            const rayLen  = r * 1.4;
+            const rayAlpha = 0.18 * (1 - expandT) * (1 - fadeT);
+            if (rayAlpha < 0.005) continue;
+            ctx.save();
+            ctx.translate(OX, OY);
+            ctx.rotate(angle);
+            const rg = ctx.createLinearGradient(0, 0, rayLen, 0);
+            rg.addColorStop(0,   `rgba(162,155,254,${rayAlpha * 2.5})`);
+            rg.addColorStop(0.25,`rgba(162,155,254,${rayAlpha})`);
+            rg.addColorStop(1,   'rgba(162,155,254,0)');
+            const rw2 = 6 + Math.sin(ts * 0.008 + i * 0.7) * 3;
+            ctx.fillStyle = rg;
+            ctx.beginPath();
+            ctx.moveTo(0, -rw2 * 0.5);
+            ctx.lineTo(rayLen, 0);
+            ctx.lineTo(0, rw2 * 0.5);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
+        // Energy ring at boundary
+        if (expandT < 1) {
+          const rw  = Math.min(65, r * 0.13);
+          const gr  = ctx.createRadialGradient(OX, OY, r - rw, OX, OY, r + 18);
+          const iA  = 0.7 * (1 - expandT * 0.65);
+          gr.addColorStop(0,   'rgba(0,184,148,0)');
+          gr.addColorStop(0.3, `rgba(0,184,148,${iA})`);
+          gr.addColorStop(0.65,`rgba(108,99,255,${iA * 1.2})`);
+          gr.addColorStop(1,   'rgba(108,99,255,0)');
+          ctx.beginPath();
+          ctx.arc(OX, OY, r, 0, Math.PI * 2);
+          ctx.strokeStyle = gr;
+          ctx.lineWidth   = rw + 8;
+          ctx.stroke();
+
+          // Electric dashed outer ring
+          ctx.beginPath();
+          ctx.arc(OX, OY, r + 22, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(0,184,148,${0.28 * (1 - expandT)})`;
+          ctx.lineWidth   = 1.5;
+          ctx.setLineDash([8, 12]);
+          ctx.lineDashOffset = ts * 0.15;
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Outside: brief bright halo vignette on existing page
+        if (expandT < 0.8) {
+          const vg = ctx.createRadialGradient(OX, OY, r * 0.9, OX, OY, r * 1.6);
+          vg.addColorStop(0, 'rgba(255,255,255,0)');
+          vg.addColorStop(1, `rgba(255,255,255,${0.12 * (1 - expandT)})`);
+          ctx.fillStyle = vg;
+          ctx.fillRect(0, 0, W, H);
+        }
+      }
+
+      ctx.globalAlpha = 1;
+
+      if (t < 1) {
+        rafId = requestAnimationFrame(frame);
+      } else {
+        onComplete();
+      }
+    };
+
+    rafId = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(rafId);
+  }, [mode, onThemeChange, onComplete]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed',
+        top: 0, left: 0,
+        width: '100vw',
+        height: '100vh',
+        pointerEvents: 'none',
+        zIndex: 99998,
+      }}
+    />
+  );
+}
+
 /* ── Theme toggle button ── */
-function ThemeToggle({ darkMode, onToggle }) {
+function ThemeToggle({ darkMode, onToggle, activating }) {
   return (
     <button
-      className="theme-toggle"
+      className={`theme-toggle${activating ? ' theme-toggle--activating' : ''}`}
       onClick={onToggle}
       aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
       title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -359,14 +709,28 @@ function App() {
     const stored = localStorage.getItem('theme');
     return stored ? stored === 'dark' : true;
   });
+  const [transition, setTransition] = useState(null); // 'to-dark' | 'to-light' | null
+  const [toggleActivating, setToggleActivating] = useState(false);
 
   const toggleTheme = () => {
+    if (transition) return;
+    const mode = darkMode ? 'to-light' : 'to-dark';
+    setToggleActivating(true);
+    setTimeout(() => setToggleActivating(false), 600);
+    setTransition(mode);
+  };
+
+  const handleTransitionThemeChange = useCallback(() => {
     setDarkMode(prev => {
       const next = !prev;
       localStorage.setItem('theme', next ? 'dark' : 'light');
       return next;
     });
-  };
+  }, []);
+
+  const handleTransitionComplete = useCallback(() => {
+    setTransition(null);
+  }, []);
 
   useEffect(() => {
     fetch('/stats.json')
@@ -453,7 +817,14 @@ function App() {
   return (
     <div className={`portfolio${darkMode ? '' : ' light-mode'}`}>
       <CursorTrail />
-      <ThemeToggle darkMode={darkMode} onToggle={toggleTheme} />
+      {transition && (
+        <SciFiTransition
+          mode={transition}
+          onThemeChange={handleTransitionThemeChange}
+          onComplete={handleTransitionComplete}
+        />
+      )}
+      <ThemeToggle darkMode={darkMode} onToggle={toggleTheme} activating={toggleActivating} />
       <nav className="nav">
         <div className="nav-logo">NR</div>
         <ul className={`nav-links${menuOpen ? ' nav-links--open' : ''}`}>
