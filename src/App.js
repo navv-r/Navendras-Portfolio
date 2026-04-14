@@ -346,8 +346,8 @@ function strokeBolt(ctx, pts, lw, color, glowColor) {
 
 const SMOKE_PUFFS = Array.from({ length: 10 }, (_, i) => ({
   left : `${4 + i * 9.5}%`,
-  delay: `${(i * 0.17).toFixed(2)}s`,
-  dur  : `${(1.5 + (i % 3) * 0.45).toFixed(2)}s`,
+  delay: `${(i * 0.06).toFixed(2)}s`,
+  dur  : `${(0.65 + (i % 3) * 0.18).toFixed(2)}s`,
   drift: `${(i % 2 === 0 ? -1 : 1) * (7 + (i % 4) * 6)}px`,
   size : 7 + (i % 3) * 4,
 }));
@@ -419,19 +419,26 @@ function LightningName() {
       ctx.globalAlpha = 1;
     };
 
-    // Triple flicker for realism
+    // Five-pass flicker for realism
     drawOnce();
     setTimeout(drawOnce, 55);
     setTimeout(() => ctx.clearRect(0, 0, W, H), 110);
     setTimeout(drawOnce, 155);
-    setTimeout(() => ctx.clearRect(0, 0, W, H), 230);
+    setTimeout(() => ctx.clearRect(0, 0, W, H), 220);
+    setTimeout(drawOnce, 270);
+    setTimeout(() => ctx.clearRect(0, 0, W, H), 340);
+    setTimeout(drawOnce, 380);
+    setTimeout(() => ctx.clearRect(0, 0, W, H), 460);
   }, []);
 
   useEffect(() => {
     let tid;
+    let firstStrike = true;
     const cycle = () => {
       setPhase('idle');
-      // Idle 4.5–7s
+      // First strike fires fast; subsequent idles 2.5–4s
+      const idleMs = firstStrike ? 600 + Math.random() * 400 : 2500 + Math.random() * 1500;
+      firstStrike = false;
       tid = setTimeout(() => {
         setPhase('prestrike');
         tid = setTimeout(() => {
@@ -443,12 +450,12 @@ function LightningName() {
               setPhase('smoke');
               tid = setTimeout(() => {
                 setPhase('recover');
-                tid = setTimeout(cycle, 750);
-              }, 2500);
-            }, 800);
+                tid = setTimeout(cycle, 400);
+              }, 700);
+            }, 350);
           }, 1400);
         }, 160);
-      }, 4500 + Math.random() * 2500);
+      }, idleMs);
     };
     cycle();
     return () => clearTimeout(tid);
@@ -469,11 +476,18 @@ function LightningName() {
   }, []);
 
   const showSmoke = phase === 'smoke' || phase === 'burnt';
+  const isAnimating = phase !== 'idle' && phase !== 'recover';
 
   return (
-    <div ref={wrapRef} className="lname-wrap">
+    <div ref={wrapRef} className={`lname-wrap${isAnimating ? ' lname-animating' : ''}`}>
       <canvas ref={canvasRef} className="lname-canvas" aria-hidden="true" />
-      <h1 className={`hero-name lname lname--${phase}`}>Navendra Ramdhan</h1>
+      <h1 className={`hero-name lname lname--${phase}`}>
+        {'Navendra Ramdhan'.split('').map((ch, i) => (
+          <span key={i} className="lname-letter" style={{ '--li': i }}>
+            {ch === ' ' ? '\u00A0' : ch}
+          </span>
+        ))}
+      </h1>
       {showSmoke && (
         <div className="lname-smoke" aria-hidden="true">
           {SMOKE_PUFFS.map((p, i) => (
@@ -496,9 +510,12 @@ function LightningName() {
   );
 }
 
-/* ── Sci-Fi Theme Transition ── */
-const ANIM_DURATION = 1400;
-const MATRIX_CHARS = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホ@#$%&[]<>|/\\'.split('');
+/* ── Lightning + Code Theme Transition ── */
+const ANIM_DURATION = 1350;
+const CODE_CHARS  = '{}()[]<>=!&|/;:.,01#@$%~^*+-'.split('');
+const CODE_TOKENS = ['const','let','fn','if','for','while','return','class',
+                     '=>','===','!==','&&','||','...','/**','*/','//',
+                     '0x1f','null','true','false','⚡','λ','#!','>>','<<'];
 
 function easeOutCubicFn(t) { return 1 - Math.pow(1 - t, 3); }
 function easeInCubicFn(t)  { return t * t * t; }
@@ -514,44 +531,87 @@ function SciFiTransition({ mode, onThemeChange, onComplete }) {
     const W = (canvas.width  = window.innerWidth);
     const H = (canvas.height = window.innerHeight);
 
-    // Toggle button center (fixed bottom-right 24px, 48×48)
+    // Toggle button center (fixed bottom-right)
     const OX = W - 48;
     const OY = H - 48;
     const MAX_R = Math.hypot(W, H) * 1.08;
 
-    // Matrix rain (to-dark)
-    const CS  = Math.max(13, Math.min(18, W / 55));
+    // ── Code rain drops ──
+    const CS   = Math.max(11, Math.min(15, W / 65));
     const COLS = Math.ceil(W / CS);
-    const drops = Array.from({ length: COLS }, () => -(Math.random() * H));
+    const drops = Array.from({ length: COLS }, () => -(Math.random() * H * 0.6));
 
-    // Burst particles (both modes)
-    const BURST = Array.from({ length: 70 }, () => ({
+    // ── Burst sparks ──
+    const SPARKS = Array.from({ length: 60 }, () => ({
       angle: Math.random() * Math.PI * 2,
-      speed: 80 + Math.random() * 500,
-      r    : 1.2 + Math.random() * 2.8,
-      hue  : mode === 'to-dark'
-        ? 230 + Math.random() * 50
-        : 170 + Math.random() * 70,
+      speed: 80 + Math.random() * 480,
+      r    : 1 + Math.random() * 2.5,
     }));
 
-    // Scan lines (to-light)
-    const SCANS = Array.from({ length: 6 }, (_, i) => ({
-      offset: i / 6,
-      speed : 0.6 + Math.random() * 0.5,
-    }));
+    // ── Circuit traces (rectilinear L-shapes from origin) ──
+    const TRACES = Array.from({ length: 22 }, () => {
+      const ex = Math.random() * W;
+      const ey = Math.random() * H;
+      return {
+        // L-shape: origin → (ex, OY) → (ex, ey)
+        ex, ey,
+        len  : Math.abs(ex - OX) + Math.abs(ey - OY),
+        speed: 0.28 + Math.random() * 0.45,
+        delay: Math.random() * 0.28,
+      };
+    });
 
-    // Glitch bars (to-dark)
-    const GLITCH = Array.from({ length: 8 }, () => ({
-      y     : Math.random() * H,
-      w     : 60 + Math.random() * 260,
-      x     : Math.random() * W,
-      startT: 0.05 + Math.random() * 0.35,
-      dur   : 0.06 + Math.random() * 0.1,
-    }));
+    // ── Lightning bolts — regenerated every ~65ms for flicker ──
+    let bolts = [];
+    let lastBoltMs = 0;
+    const regenBolts = () => {
+      const count = mode === 'to-dark' ? 6 : 5;
+      bolts = Array.from({ length: count }, () => {
+        const side = Math.floor(Math.random() * 4);
+        let tx, ty;
+        if      (side === 0) { tx = Math.random() * W; ty = 0; }
+        else if (side === 1) { tx = W; ty = Math.random() * H; }
+        else if (side === 2) { tx = Math.random() * W; ty = H; }
+        else                 { tx = 0; ty = Math.random() * H; }
+        // Occasionally short inner bolts
+        if (Math.random() < 0.35) {
+          tx = OX + (Math.random() - 0.5) * W * 0.7;
+          ty = OY + (Math.random() - 0.5) * H * 0.7;
+        }
+        return {
+          pts  : zigzag(OX, OY, tx, ty, 10 + Math.floor(Math.random() * 7), 38),
+          alpha: 0.45 + Math.random() * 0.55,
+        };
+      });
+    };
+    regenBolts();
+
+    // ── Terminal lines (to-light) ──
+    const TERM = [
+      '> theme.compile("light")',
+      '> resolving: #edf2ff palette... ✓',
+      '> wiring:    lightning.css...  ⚡',
+      '> render()   complete          ✓',
+    ];
 
     let t0 = null;
     let themeFlipped = false;
     let rafId;
+
+    const drawBolt = (pts, lw, color, glow, glowBlur) => {
+      if (pts.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.lineWidth   = lw;
+      ctx.strokeStyle = color;
+      ctx.shadowColor = glow;
+      ctx.shadowBlur  = glowBlur;
+      ctx.lineCap     = 'round';
+      ctx.lineJoin    = 'round';
+      ctx.stroke();
+      ctx.shadowBlur  = 0;
+    };
 
     const frame = (ts) => {
       if (!t0) t0 = ts;
@@ -559,262 +619,302 @@ function SciFiTransition({ mode, onThemeChange, onComplete }) {
 
       if (!themeFlipped && t >= 0.42) { themeFlipped = true; onThemeChange(); }
 
+      // Regen bolts every 65ms
+      if (ts - lastBoltMs > 65) { lastBoltMs = ts; regenBolts(); }
+
       ctx.clearRect(0, 0, W, H);
 
-      const expandT  = Math.min(t / 0.60, 1);
+      const expandT  = Math.min(t / 0.62, 1);
       const r        = MAX_R * easeOutCubicFn(expandT);
       const fadeT    = t > 0.72 ? (t - 0.72) / 0.28 : 0;
-      ctx.globalAlpha = Math.max(0, 1 - easeInCubicFn(fadeT));
+      const baseAlpha = Math.max(0, 1 - easeInCubicFn(fadeT));
+      ctx.globalAlpha = baseAlpha;
 
-      /* ── shared: burst particles ── */
-      const burstT = Math.min(t / 0.5, 1);
-      for (const p of BURST) {
+      /* ── Burst sparks (both) ── */
+      const burstT = Math.min(t / 0.45, 1);
+      const sc = mode === 'to-dark' ? '140,128,255' : '100,158,255';
+      for (const p of SPARKS) {
         const dist = p.speed * easeOutCubicFn(burstT);
-        const px = OX + Math.cos(p.angle) * dist;
-        const py = OY + Math.sin(p.angle) * dist;
-        const a  = (1 - burstT) * 0.85;
-        if (a <= 0.01) continue;
+        const px   = OX + Math.cos(p.angle) * dist;
+        const py   = OY + Math.sin(p.angle) * dist;
+        const a    = (1 - burstT) * 0.88;
+        if (a < 0.02) continue;
         ctx.beginPath();
-        ctx.arc(px, py, p.r * (1 - burstT * 0.5), 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(${p.hue},78%,65%,${a})`;
-        ctx.shadowColor = `hsl(${p.hue},78%,65%)`;
-        ctx.shadowBlur  = 8;
+        ctx.arc(px, py, p.r * (1 - burstT * 0.4), 0, Math.PI * 2);
+        ctx.fillStyle   = `rgba(${sc},${a})`;
+        ctx.shadowColor = `rgb(${sc})`;
+        ctx.shadowBlur  = 7;
         ctx.fill();
-        ctx.shadowBlur = 0;
+        ctx.shadowBlur  = 0;
       }
 
       if (mode === 'to-dark') {
-        /* ══════════════ VOID COLLAPSE ══════════════ */
+        /* ══════════ LIGHTNING STORM COLLAPSE ══════════ */
 
-        // Dark expanding circle with contents
         ctx.save();
         ctx.beginPath();
         ctx.arc(OX, OY, r, 0, Math.PI * 2);
         ctx.clip();
 
+        // Dark void background
         ctx.fillStyle = '#0a0a0f';
         ctx.fillRect(0, 0, W, H);
 
-        // Subtle hex grid
-        const HS = 38;
-        ctx.strokeStyle = 'rgba(108,99,255,0.13)';
-        ctx.lineWidth = 0.6;
-        for (let row = -1; row * HS * 1.5 < H + HS; row++) {
-          for (let col = -1; col * HS * 1.73 < W + HS; col++) {
-            const hx = col * HS * 1.73 + (row % 2 === 0 ? 0 : HS * 0.865);
-            const hy = row * HS * 1.5;
-            if (Math.hypot(hx - OX, hy - OY) > r + HS) continue;
-            ctx.beginPath();
-            for (let k = 0; k < 6; k++) {
-              const a = (Math.PI / 3) * k - Math.PI / 6;
-              k === 0
-                ? ctx.moveTo(hx + HS * 0.48 * Math.cos(a), hy + HS * 0.48 * Math.sin(a))
-                : ctx.lineTo(hx + HS * 0.48 * Math.cos(a), hy + HS * 0.48 * Math.sin(a));
+        // Circuit-board L-traces growing from origin
+        for (const tr of TRACES) {
+          if (t < tr.delay) continue;
+          const tp  = Math.min((t - tr.delay) / tr.speed, 1);
+          if (tp <= 0) continue;
+          const drawn = tp * tr.len;
+          const seg1  = Math.abs(tr.ex - OX);
+          const seg2  = Math.abs(tr.ey - OY);
+
+          ctx.beginPath();
+          ctx.moveTo(OX, OY);
+          if (drawn <= seg1) {
+            ctx.lineTo(OX + (tr.ex - OX) * (drawn / (seg1 || 1)), OY);
+          } else {
+            ctx.lineTo(tr.ex, OY);
+            const rem = drawn - seg1;
+            ctx.lineTo(tr.ex, OY + (tr.ey - OY) * Math.min(rem / (seg2 || 1), 1));
+          }
+          const trA = 0.55 * Math.sin(tp * Math.PI);
+          ctx.strokeStyle = `rgba(108,99,255,${trA})`;
+          ctx.lineWidth   = 0.85;
+          ctx.shadowColor = '#6c63ff';
+          ctx.shadowBlur  = 5;
+          ctx.stroke();
+          ctx.shadowBlur  = 0;
+
+          // Travelling dot at the head
+          if (tp < 0.99) {
+            let hx, hy;
+            if (drawn <= seg1) {
+              hx = OX + (tr.ex - OX) * (drawn / (seg1 || 1));
+              hy = OY;
+            } else {
+              hx = tr.ex;
+              hy = OY + (tr.ey - OY) * Math.min((drawn - seg1) / (seg2 || 1), 1);
             }
-            ctx.closePath();
-            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(hx, hy, 2.2, 0, Math.PI * 2);
+            ctx.fillStyle   = `rgba(200,195,255,${trA * 1.4})`;
+            ctx.shadowColor = '#aaddff';
+            ctx.shadowBlur  = 8;
+            ctx.fill();
+            ctx.shadowBlur  = 0;
           }
         }
 
-        // Matrix rain
+        // Syntax code rain
         ctx.font = `${CS}px "JetBrains Mono",monospace`;
+        const rainA = Math.min(t * 3, 1) * 0.9;
         for (let i = 0; i < COLS; i++) {
           const cx2 = i * CS;
-          for (let j = 0; j < 18; j++) {
-            const cy2 = drops[i] - j * CS;
-            if (cy2 < -CS || cy2 > H) continue;
-            // rough circle clip check
-            if (Math.hypot(cx2 - OX, cy2 - OY) > r) continue;
-            const char  = MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
-            const alpha = (1 - j / 18) * Math.min(t * 2.5, 1) * 0.85;
-            ctx.fillStyle = j === 0
-              ? `rgba(220,210,255,${alpha})`
-              : j < 4
-              ? `rgba(162,155,254,${alpha})`
-              : `rgba(108,99,255,${alpha * 0.65})`;
-            ctx.fillText(char, cx2, cy2);
+          if (drops[i] < -CS || drops[i] > H + CS) { drops[i] += CS * 0.5; continue; }
+          const useWord = Math.random() < 0.1;
+          const ch = useWord
+            ? CODE_TOKENS[Math.floor(Math.random() * CODE_TOKENS.length)]
+            : CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+          if (Math.hypot(cx2 + CS / 2 - OX, drops[i] - OY) <= r) {
+            ctx.fillStyle = `rgba(220,210,255,${rainA})`;
+            ctx.fillText(ch, cx2, drops[i]);
+            for (let j = 1; j <= 6; j++) {
+              const ty2 = drops[i] - j * CS;
+              if (ty2 < 0 || Math.hypot(cx2 + CS / 2 - OX, ty2 - OY) > r) continue;
+              const tc = CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+              const ta = (1 - j / 7) * rainA * (j === 1 ? 0.7 : j === 2 ? 0.45 : 0.22);
+              ctx.fillStyle = j <= 2
+                ? `rgba(162,155,254,${ta})`
+                : `rgba(108,99,255,${ta})`;
+              ctx.fillText(tc, cx2, ty2);
+            }
           }
-          drops[i] += CS * 0.45;
-          if (drops[i] > H + CS * 12) drops[i] = -(CS * (4 + Math.random() * 8));
+          drops[i] += CS * 0.52;
+          if (drops[i] > H + CS * 5) drops[i] = -(CS * (2 + Math.random() * 5));
         }
 
-        // Glitch horizontal bars
-        for (const g of GLITCH) {
-          if (t > g.startT && t < g.startT + g.dur) {
-            const lt = (t - g.startT) / g.dur;
-            ctx.fillStyle = `rgba(108,99,255,${0.55 * Math.sin(lt * Math.PI)})`;
-            ctx.fillRect(g.x, g.y, g.w, 2);
-            ctx.fillStyle = `rgba(0,184,148,${0.35 * Math.sin(lt * Math.PI)})`;
-            ctx.fillRect(g.x + 8, g.y + 2, g.w * 0.6, 1);
+        // Lightning bolts radiating from origin
+        if (t > 0.04 && t < 0.78) {
+          const bA = Math.min((t - 0.04) / 0.18, 1) * (1 - Math.max((t - 0.58) / 0.2, 0));
+          ctx.save();
+          ctx.globalAlpha = baseAlpha * bA;
+          for (const bolt of bolts) {
+            const pts = bolt.pts.filter(([bx, by]) => Math.hypot(bx - OX, by - OY) <= r);
+            if (pts.length < 2) continue;
+            drawBolt(pts, 7,   `rgba(108,99,255,${bolt.alpha * 0.25})`, '#6c63ff', 18);
+            drawBolt(pts, 2.5, `rgba(162,155,254,${bolt.alpha * 0.7})`, '#a09bfe', 10);
+            drawBolt(pts, 1,   `rgba(220,215,255,${bolt.alpha * 0.95})`, '#c8c4ff', 5);
           }
+          ctx.restore();
         }
 
-        // Constellation dots inside void
-        const numDots = Math.floor(80 * Math.min(t * 3, 1));
-        for (let d = 0; d < numDots; d++) {
-          const seed = d * 137.508;
-          const dx = (Math.sin(seed * 0.7) * 0.5 + 0.5) * W;
-          const dy = (Math.cos(seed * 0.3) * 0.5 + 0.5) * H;
-          if (Math.hypot(dx - OX, dy - OY) > r * 0.92) continue;
-          const twinkle = 0.3 + 0.7 * Math.abs(Math.sin(ts * 0.003 + d));
-          ctx.beginPath();
-          ctx.arc(dx, dy, 0.8 + (d % 3) * 0.4, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(200,190,255,${twinkle * 0.7})`;
-          ctx.fill();
+        // Initial purple flash
+        if (t < 0.1) {
+          ctx.fillStyle = `rgba(180,170,255,${(1 - t / 0.1) * 0.75})`;
+          ctx.fillRect(0, 0, W, H);
         }
 
         ctx.restore();
 
-        // Neon ring at boundary edge
+        // Purple crackling boundary ring
         if (expandT < 1) {
-          const rw  = Math.min(55, r * 0.12);
-          const gr  = ctx.createRadialGradient(OX, OY, r - rw, OX, OY, r + 12);
-          const iA  = 0.65 * (1 - expandT * 0.7);
-          gr.addColorStop(0,   'rgba(108,99,255,0)');
-          gr.addColorStop(0.35,`rgba(108,99,255,${iA})`);
-          gr.addColorStop(0.7, `rgba(162,155,254,${iA * 1.3})`);
-          gr.addColorStop(1,   'rgba(108,99,255,0)');
+          const rw = Math.min(55, r * 0.12);
+          const gr = ctx.createRadialGradient(OX, OY, r - rw, OX, OY, r + 12);
+          const iA = 0.68 * (1 - expandT * 0.7);
+          gr.addColorStop(0,    'rgba(108,99,255,0)');
+          gr.addColorStop(0.35, `rgba(108,99,255,${iA})`);
+          gr.addColorStop(0.72, `rgba(200,195,255,${iA * 1.35})`);
+          gr.addColorStop(1,    'rgba(108,99,255,0)');
           ctx.beginPath();
           ctx.arc(OX, OY, r, 0, Math.PI * 2);
           ctx.strokeStyle = gr;
           ctx.lineWidth   = rw + 10;
           ctx.stroke();
-
-          // Secondary outer electric arc ring
+          // Dashed lightning arc
           ctx.beginPath();
-          ctx.arc(OX, OY, r + 18, 0, Math.PI * 2);
-          ctx.strokeStyle = `rgba(0,184,148,${0.3 * (1 - expandT)})`;
-          ctx.lineWidth   = 2;
-          ctx.setLineDash([6, 14]);
-          ctx.lineDashOffset = -ts * 0.12;
+          ctx.arc(OX, OY, r + 17, 0, Math.PI * 2);
+          ctx.strokeStyle    = `rgba(162,155,254,${0.38 * (1 - expandT)})`;
+          ctx.lineWidth      = 2;
+          ctx.setLineDash([4, 10]);
+          ctx.lineDashOffset = -ts * 0.14;
           ctx.stroke();
           ctx.setLineDash([]);
         }
 
-        // Outside glitch scanlines
+        // Outside: glitch scanlines
         if (expandT < 0.95) {
-          const ng = Math.floor(6 * t);
-          for (let g = 0; g < ng; g++) {
-            const gy = (H * (g + 1)) / (ng + 1) + Math.sin(ts * 0.02 + g) * 12;
-            ctx.fillStyle = `rgba(108,99,255,${0.12 * Math.random()})`;
-            ctx.fillRect(Math.sin(ts * 0.01 + g) * 30, gy, W * (0.1 + 0.4 * Math.random()), 1.5);
+          for (let g = 0, ng = Math.floor(5 * t); g < ng; g++) {
+            const gy = (H * (g + 1)) / (ng + 1) + Math.sin(ts * 0.02 + g) * 10;
+            ctx.fillStyle = `rgba(108,99,255,${0.09 * Math.random()})`;
+            ctx.fillRect(Math.sin(ts * 0.01 + g) * 28, gy, W * (0.08 + 0.32 * Math.random()), 1.5);
           }
         }
 
       } else {
-        /* ══════════════ PHOTON SURGE ══════════════ */
+        /* ══════════ COMPILE BURST ══════════ */
 
-        // Bright expanding circle
         ctx.save();
         ctx.beginPath();
         ctx.arc(OX, OY, r, 0, Math.PI * 2);
         ctx.clip();
 
-        ctx.fillStyle = '#f5f5f8';
+        // Light blue background
+        ctx.fillStyle = '#edf2ff';
         ctx.fillRect(0, 0, W, H);
 
-        // Grid lines
-        const GS = 44;
-        ctx.strokeStyle = 'rgba(108,99,255,0.07)';
+        // Grid
+        ctx.strokeStyle = 'rgba(70,110,255,0.07)';
         ctx.lineWidth   = 0.6;
-        for (let gx = 0; gx < W; gx += GS) {
-          ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
-        }
-        for (let gy = 0; gy < H; gy += GS) {
-          ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
-        }
+        for (let gx = 0; gx < W; gx += 44) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+        for (let gy = 0; gy < H; gy += 44) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
 
-        // Sweeping scan lines
-        for (const sc of SCANS) {
-          const sy  = ((t * sc.speed + sc.offset) % 1) * H;
-          const sg  = ctx.createLinearGradient(0, sy - 35, 0, sy + 35);
-          const sA  = 0.22 * (1 - fadeT);
-          sg.addColorStop(0,   'rgba(108,99,255,0)');
-          sg.addColorStop(0.45,`rgba(108,99,255,${sA})`);
-          sg.addColorStop(0.5, `rgba(162,155,254,${sA * 1.4})`);
-          sg.addColorStop(0.55,`rgba(108,99,255,${sA})`);
-          sg.addColorStop(1,   'rgba(108,99,255,0)');
-          ctx.fillStyle = sg;
-          ctx.fillRect(0, sy - 35, W, 70);
-        }
-
-        // Light data particles
-        const numLP = Math.floor(50 * Math.min(t * 2.5, 1));
-        for (let d = 0; d < numLP; d++) {
-          const seed = d * 113.7;
-          const lx   = (Math.sin(seed * 0.5 + ts * 0.001) * 0.5 + 0.5) * W;
-          const ly   = (Math.cos(seed * 0.8) * 0.5 + 0.5) * H - (t * 80);
+        // Floating code tokens drifting upward
+        ctx.font = `${CS}px "JetBrains Mono",monospace`;
+        const numTok = Math.floor(40 * Math.min(t * 3, 1));
+        for (let i = 0; i < numTok; i++) {
+          const seed = i * 97.3;
+          const lx   = (Math.sin(seed * 0.5) * 0.5 + 0.5) * W;
+          const ly   = (Math.cos(seed * 0.8) * 0.5 + 0.5) * H - t * 95;
           if (Math.hypot(lx - OX, ly - OY) > r * 0.95) continue;
-          ctx.beginPath();
-          ctx.arc(lx, ly, 1 + (d % 3) * 0.6, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(108,99,255,${0.4 + 0.4 * Math.abs(Math.sin(ts * 0.004 + d))})`;
-          ctx.shadowColor = '#6c63ff';
-          ctx.shadowBlur  = 6;
-          ctx.fill();
+          const tok  = CODE_TOKENS[i % CODE_TOKENS.length];
+          const tokA = 0.22 + 0.28 * Math.abs(Math.sin(ts * 0.004 + i));
+          ctx.fillStyle   = `rgba(91,114,255,${tokA})`;
+          ctx.shadowColor = '#5b72ff';
+          ctx.shadowBlur  = 4;
+          ctx.fillText(tok, lx, ly);
+          ctx.shadowBlur  = 0;
+        }
+
+        // Blue-white lightning bolts
+        if (t > 0.05 && t < 0.72) {
+          const bA = Math.min((t - 0.05) / 0.15, 1) * (1 - Math.max((t - 0.54) / 0.18, 0));
+          ctx.save();
+          ctx.globalAlpha = baseAlpha * bA;
+          for (const bolt of bolts) {
+            const pts = bolt.pts.filter(([bx, by]) => Math.hypot(bx - OX, by - OY) <= r);
+            if (pts.length < 2) continue;
+            drawBolt(pts, 9,   `rgba(80,140,255,${bolt.alpha * 0.22})`,  '#5b72ff', 22);
+            drawBolt(pts, 2.8, `rgba(140,190,255,${bolt.alpha * 0.65})`, '#88bbff', 12);
+            drawBolt(pts, 1.2, `rgba(220,235,255,${bolt.alpha * 0.95})`, '#c8e0ff', 5);
+          }
+          ctx.restore();
+        }
+
+        // Terminal compile output (typewriter)
+        if (t > 0.22 && t < 0.93) {
+          const tT  = (t - 0.22) / 0.71;
+          const tx2 = 32, ty2 = H * 0.18, lh = 22;
+          ctx.font = `13px "JetBrains Mono",monospace`;
+          for (let li = 0; li < TERM.length; li++) {
+            const ls = li / TERM.length;
+            const le = (li + 1) / TERM.length;
+            if (tT < ls) break;
+            const lt      = Math.min((tT - ls) / (le - ls), 1);
+            const visible = TERM[li].slice(0, Math.floor(lt * TERM[li].length));
+            const a       = Math.min(tT * 3.5, 0.82);
+            ctx.fillStyle   = `rgba(22,16,60,${a})`;
+            ctx.shadowColor = '#5b72ff';
+            ctx.shadowBlur  = li === TERM.length - 1 ? 7 : 0;
+            ctx.fillText(visible, tx2, ty2 + li * lh);
+            // Cursor on active line
+            const activeLine = Math.min(Math.floor(tT * TERM.length), TERM.length - 1);
+            if (li === activeLine && Math.floor(lt * TERM[li].length) < TERM[li].length) {
+              if (Math.floor(ts / 220) % 2 === 0) {
+                const cw = ctx.measureText(visible).width;
+                ctx.fillStyle = `rgba(91,114,255,${a})`;
+                ctx.fillRect(tx2 + cw, ty2 + li * lh - 13, 7, 14);
+              }
+            }
+          }
           ctx.shadowBlur = 0;
+        }
+
+        // Blue-white compile flash at start
+        if (t < 0.13) {
+          ctx.fillStyle = `rgba(180,210,255,${(1 - t / 0.13) * 0.7})`;
+          ctx.fillRect(0, 0, W, H);
         }
 
         ctx.restore();
 
-        // Lens flare rays from origin
-        if (expandT < 0.9) {
-          const numRays = 20;
-          for (let i = 0; i < numRays; i++) {
-            const angle   = (i / numRays) * Math.PI * 2 + ts * 0.0005;
-            const rayLen  = r * 1.4;
-            const rayAlpha = 0.18 * (1 - expandT) * (1 - fadeT);
-            if (rayAlpha < 0.005) continue;
-            ctx.save();
-            ctx.translate(OX, OY);
-            ctx.rotate(angle);
-            const rg = ctx.createLinearGradient(0, 0, rayLen, 0);
-            rg.addColorStop(0,   `rgba(162,155,254,${rayAlpha * 2.5})`);
-            rg.addColorStop(0.25,`rgba(162,155,254,${rayAlpha})`);
-            rg.addColorStop(1,   'rgba(162,155,254,0)');
-            const rw2 = 6 + Math.sin(ts * 0.008 + i * 0.7) * 3;
-            ctx.fillStyle = rg;
-            ctx.beginPath();
-            ctx.moveTo(0, -rw2 * 0.5);
-            ctx.lineTo(rayLen, 0);
-            ctx.lineTo(0, rw2 * 0.5);
-            ctx.fill();
-            ctx.restore();
-          }
+        // Sweeping blue scan lines
+        for (const [off, spd] of [[0, 0.85], [0.55, 0.6]]) {
+          const sy = ((t * spd + off) % 1) * H;
+          const sg = ctx.createLinearGradient(0, sy - 32, 0, sy + 32);
+          const sA = 0.18 * (1 - fadeT);
+          sg.addColorStop(0,    'rgba(91,114,255,0)');
+          sg.addColorStop(0.45, `rgba(91,114,255,${sA})`);
+          sg.addColorStop(0.5,  `rgba(180,205,255,${sA * 1.5})`);
+          sg.addColorStop(0.55, `rgba(91,114,255,${sA})`);
+          sg.addColorStop(1,    'rgba(91,114,255,0)');
+          ctx.fillStyle = sg;
+          ctx.fillRect(0, sy - 32, W, 64);
         }
 
-        // Energy ring at boundary
+        // Blue boundary ring
         if (expandT < 1) {
-          const rw  = Math.min(65, r * 0.13);
-          const gr  = ctx.createRadialGradient(OX, OY, r - rw, OX, OY, r + 18);
-          const iA  = 0.7 * (1 - expandT * 0.65);
-          gr.addColorStop(0,   'rgba(0,184,148,0)');
-          gr.addColorStop(0.3, `rgba(0,184,148,${iA})`);
-          gr.addColorStop(0.65,`rgba(108,99,255,${iA * 1.2})`);
-          gr.addColorStop(1,   'rgba(108,99,255,0)');
+          const rw = Math.min(60, r * 0.12);
+          const gr = ctx.createRadialGradient(OX, OY, r - rw, OX, OY, r + 18);
+          const iA = 0.72 * (1 - expandT * 0.65);
+          gr.addColorStop(0,    'rgba(91,114,255,0)');
+          gr.addColorStop(0.3,  `rgba(91,114,255,${iA})`);
+          gr.addColorStop(0.65, `rgba(180,210,255,${iA * 1.3})`);
+          gr.addColorStop(1,    'rgba(91,114,255,0)');
           ctx.beginPath();
           ctx.arc(OX, OY, r, 0, Math.PI * 2);
           ctx.strokeStyle = gr;
           ctx.lineWidth   = rw + 8;
           ctx.stroke();
-
-          // Electric dashed outer ring
+          // Dashed outer arc
           ctx.beginPath();
-          ctx.arc(OX, OY, r + 22, 0, Math.PI * 2);
-          ctx.strokeStyle = `rgba(0,184,148,${0.28 * (1 - expandT)})`;
-          ctx.lineWidth   = 1.5;
-          ctx.setLineDash([8, 12]);
-          ctx.lineDashOffset = ts * 0.15;
+          ctx.arc(OX, OY, r + 20, 0, Math.PI * 2);
+          ctx.strokeStyle    = `rgba(100,160,255,${0.3 * (1 - expandT)})`;
+          ctx.lineWidth      = 1.5;
+          ctx.setLineDash([6, 14]);
+          ctx.lineDashOffset = ts * 0.14;
           ctx.stroke();
           ctx.setLineDash([]);
-        }
-
-        // Outside: brief bright halo vignette on existing page
-        if (expandT < 0.8) {
-          const vg = ctx.createRadialGradient(OX, OY, r * 0.9, OX, OY, r * 1.6);
-          vg.addColorStop(0, 'rgba(255,255,255,0)');
-          vg.addColorStop(1, `rgba(255,255,255,${0.12 * (1 - expandT)})`);
-          ctx.fillStyle = vg;
-          ctx.fillRect(0, 0, W, H);
         }
       }
 

@@ -1434,21 +1434,8 @@ html, body { max-width: 100%; overflow-x: hidden; }
   to   { background-position: 56px 56px; }
 }
 
-/* ── Hero name: glitch on hover (desktop/pointer only) ── */
+/* ── Hero name: cursor ── */
 .hero-name { cursor: default; }
-@media (hover: hover) {
-  .hero-name:hover {
-    animation: name-glitch 0.35s steps(4, end) infinite;
-  }
-}
-@keyframes name-glitch {
-  0%   { filter: none;                              transform: none; }
-  20%  { filter: hue-rotate(80deg)  saturate(2);   transform: skewX(-3deg) translateX(4px); }
-  40%  { filter: hue-rotate(200deg) saturate(1.6); transform: skewX(2deg)  translateX(-3px); }
-  60%  { filter: hue-rotate(310deg) saturate(2.2); transform: skewX(-1deg) translateX(2px); }
-  80%  { filter: hue-rotate(40deg)  saturate(1.8); transform: skewX(3deg)  translateX(-4px); }
-  100% { filter: none;                              transform: none; }
-}
 
 /* ── Tech stack: coding-themed idle animations ── */
 
@@ -1887,20 +1874,20 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .lname--burnt {
   filter: sepia(0.75) brightness(0.62) contrast(1.35) saturate(0.35);
   transform: translate(0, 0);
-  transition: filter 0.75s ease, transform 0.3s ease;
+  transition: filter 0.25s ease, transform 0.2s ease;
 }
 
 /* ── Phase: smoke — stays charred ── */
 .lname--smoke {
   filter: sepia(0.65) brightness(0.68) contrast(1.25) saturate(0.4);
-  transition: filter 0.4s ease;
+  transition: filter 0.2s ease;
 }
 
 /* ── Phase: recover ── */
 .lname--recover {
   filter: none;
   transform: translate(0, 0);
-  transition: filter 0.75s ease;
+  transition: filter 0.35s ease;
 }
 
 /* ── Smoke particles ── */
@@ -1925,7 +1912,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
   top: 40%;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(110,110,110,0.55) 0%, rgba(80,80,80,0) 100%);
-  animation: smoke-rise var(--sdur, 2s) ease-out infinite;
+  animation: smoke-rise var(--sdur, 0.9s) ease-out infinite;
   --sdrift: 0px;
 }
 
@@ -1982,6 +1969,43 @@ html, body { max-width: 100%; overflow-x: hidden; }
   }
 }
 
+/* ── Letter-by-letter hover lightning ── */
+.lname-letter {
+  display: inline;
+}
+
+/* Dark mode: glow radiates outward from each letter's glyph shape */
+@keyframes letter-strike {
+  0%   { text-shadow: none; }
+  6%   { text-shadow: 0 0 2px #fff, 0 0 8px #c8eeff, 0 0 22px #3388ff, 0 0 50px #1144ff; }
+  18%  { text-shadow: 0 0 5px #ddf2ff, 0 0 18px #66aaff, 0 0 40px #2255ee; }
+  45%  { text-shadow: 0 0 3px #aaccff, 0 0 12px #4477dd; }
+  100% { text-shadow: none; }
+}
+
+@media (hover: hover) {
+  .lname-wrap:not(.lname-animating):hover .lname-letter {
+    animation: letter-strike 0.55s ease-out both;
+    animation-delay: calc(var(--li) * 58ms);
+  }
+}
+
+/* Light mode variant — text is solid dark; use a brighter blue-white flash */
+@keyframes letter-strike-light {
+  0%   { text-shadow: none; }
+  6%   { text-shadow: 0 0 2px #fff, 0 0 10px #99ccff, 0 0 26px #3377ff, 0 0 55px #0033ff; }
+  18%  { text-shadow: 0 0 6px #bbddff, 0 0 20px #5599ff, 0 0 40px #2244cc; }
+  45%  { text-shadow: 0 0 3px #99bbff, 0 0 12px #4466cc; }
+  100% { text-shadow: none; }
+}
+
+@media (hover: hover) {
+  .light-mode .lname-wrap:not(.lname-animating):hover .lname-letter {
+    animation: letter-strike-light 0.55s ease-out both;
+    animation-delay: calc(var(--li) * 58ms);
+  }
+}
+
 /* ════════════════════════════════════════
    LIGHT MODE — "Editorial"
    Original colours, serif + Inter typography,
@@ -1989,12 +2013,13 @@ html, body { max-width: 100%; overflow-x: hidden; }
    ════════════════════════════════════════ */
 
 .light-mode {
-  --bg:      #f5f5f8;
-  --bg-alt:  #eaeaf0;
-  --surface: #ffffff;
-  --border:  #d0d0df;
-  --text:    #1a1a2e;
-  --muted:   #6060a0;
+  --bg:      #edf2ff;
+  --bg-alt:  #e4eaff;
+  --surface: #f4f7ff;
+  --border:  #bccdf5;
+  --text:    #16103c;
+  --muted:   #5060a8;
+  --accent:  #5b72ff;
 }
 
 /* ── Base ── */
@@ -2013,7 +2038,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
 /* ── Nav — crisp, minimal strip ── */
 .light-mode .nav {
-  background: rgba(245,245,248,0.94);
+  background: rgba(237,242,255,0.94);
   border-bottom: 1px solid var(--border);
   box-shadow: none;
 }
@@ -2045,28 +2070,29 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
 @media (max-width: 768px) {
   .light-mode .nav-links {
-    background: rgba(245,245,248,0.98);
+    background: rgba(237,242,255,0.98);
   }
 }
 
 /* ── Hero — finer grid, no blobs recolor ── */
 .light-mode .hero {
   background-image:
-    linear-gradient(rgba(108,99,255,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(108,99,255,0.06) 1px, transparent 1px);
+    linear-gradient(rgba(70,110,255,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(70,110,255,0.07) 1px, transparent 1px);
   background-size: 44px 44px;
 }
 
-/* Hero name — Playfair Display italic, solid colour, no gradient */
+/* Hero name — Playfair Display italic, deep purple-navy */
 .light-mode .hero-name {
   font-family: 'Playfair Display', Georgia, serif;
   font-style: italic;
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.08;
-  background: none;
-  -webkit-text-fill-color: var(--text);
-  color: var(--text);
+  background: linear-gradient(135deg, var(--text) 40%, var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Hero greeting — Inter, spaced caps */
@@ -2094,12 +2120,12 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
 .light-mode .btn-primary:hover {
   transform: translateY(-3px);
-  box-shadow: 0 10px 28px rgba(108,99,255,0.28);
+  box-shadow: 0 10px 28px rgba(80,110,255,0.32);
 }
 
 .light-mode .btn-outline:hover {
   transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(108,99,255,0.14);
+  box-shadow: 0 6px 20px rgba(80,110,255,0.20);
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -2125,9 +2151,9 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
 /* ── Terminal ── */
 .light-mode .about-terminal {
-  background: #f8f9fc;
-  border-color: #d0d0df;
-  box-shadow: 0 0 0 1px #e0e0ee, 0 8px 32px rgba(0,0,0,0.08);
+  background: #edf3ff;
+  border-color: #b8caf0;
+  box-shadow: 0 0 0 1px #d0dcf8, 0 8px 32px rgba(40,60,180,0.08);
 }
 
 .light-mode .about-terminal::before {
@@ -2141,19 +2167,19 @@ html, body { max-width: 100%; overflow-x: hidden; }
 }
 
 .light-mode .terminal-bar {
-  background: #ecedf5;
-  border-bottom-color: #d0d0df;
+  background: #dce8ff;
+  border-bottom-color: #b8caf0;
 }
 
-.light-mode .terminal-bar-title { color: #7070a0; }
+.light-mode .terminal-bar-title { color: #5870b8; }
 .light-mode .t-prompt { color: var(--accent); }
-.light-mode .t-cmd    { color: #2060c0; }
-.light-mode .t-output { color: #5a5a80; }
+.light-mode .t-cmd    { color: #1a50c8; }
+.light-mode .t-output { color: #4458a0; }
 .light-mode .t-cursor { background: var(--accent); }
 
 .light-mode .about-stats {
-  background: #f8f9fc;
-  border-top-color: #d0d0df;
+  background: #edf3ff;
+  border-top-color: #b8caf0;
 }
 
 /* ── Tech stack cards — clean lift, no neon glow ── */
@@ -2168,7 +2194,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .light-mode .techstack-item:hover {
   transform: translateY(-8px) scale(1.04);
   border-color: var(--accent);
-  box-shadow: 0 18px 40px rgba(0,0,0,0.10), 0 0 0 1px rgba(108,99,255,0.18);
+  box-shadow: 0 18px 40px rgba(40,60,180,0.13), 0 0 0 1px rgba(80,110,255,0.22);
 }
 
 .light-mode .techstack-label {
@@ -2179,8 +2205,8 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
 /* Next.js icon — white by default, needs dark in light mode */
 .light-mode .techstack-item:nth-child(6) svg {
-  color: #1a1a2e !important;
-  fill: #1a1a2e !important;
+  color: #16103c !important;
+  fill: #16103c !important;
 }
 
 /* ── Carousel — clean card shadows ── */
@@ -2210,13 +2236,13 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
 .light-mode .contact-form input:hover,
 .light-mode .contact-form textarea:hover {
-  border-color: #b0b0cc;
+  border-color: #90aae5;
 }
 
 .light-mode .contact-form input:focus,
 .light-mode .contact-form textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(108,99,255,0.12);
+  box-shadow: 0 0 0 3px rgba(80,120,255,0.15);
   outline: none;
 }
 
