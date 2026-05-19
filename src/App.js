@@ -51,6 +51,7 @@ const PROJECTS = [
     color: '#00b4d8',
     label: 'LIMS',
     link: 'https://lims-but-better.vercel.app',
+    image: '/lims logo.png',
   },
 ];
 
