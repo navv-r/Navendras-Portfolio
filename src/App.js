@@ -45,6 +45,13 @@ const PROJECTS = [
     link: 'https://skinstric-internship-pi.vercel.app',
     image: '/skinstric.png',
   },
+  {
+    title: 'LIMS But Better',
+    desc: 'A redesigned Laboratory Information Management System that streamlines common lab workflows — cutting redundant clicks and eliminating tedious import/export steps so technicians can focus on the work that matters.',
+    color: '#00b4d8',
+    label: 'LIMS',
+    link: 'https://lims-but-better.vercel.app',
+  },
 ];
 
 /* ── Cursor trail ── */
