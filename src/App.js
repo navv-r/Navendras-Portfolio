@@ -793,6 +793,111 @@ function ThemeToggle({ darkMode, onToggle, activating }) {
   );
 }
 
+/* ── Boot Loader (first-load terminal sequence) ── */
+function makeBootLines(darkMode) {
+  return [
+    { prompt: '$', text: './boot --portfolio',         kind: 'cmd' },
+    { prompt: '>', text: 'loading assets',              kind: 'task', status: '✓' },
+    { prompt: '>', text: 'mounting react@19',           kind: 'task', status: '✓' },
+    { prompt: '>', text: 'compiling styles',            kind: 'task', status: '✓' },
+    { prompt: '>', text: `theme: ${darkMode ? 'dark' : 'light'} mode`, kind: 'task', status: '⚡' },
+    { prompt: '$', text: 'launch portfolio',            kind: 'cmd' },
+  ];
+}
+
+function BootLoader({ darkMode, onDone }) {
+  const reduced = useRef(
+    typeof window !== 'undefined' &&
+    window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ).current;
+
+  const lines = useRef(makeBootLines(darkMode)).current;
+  const totalChars = useRef(
+    lines.reduce((sum, l) => sum + l.text.length, 0)
+  ).current;
+
+  const [step, setStep] = useState(0);   // index of line currently typing
+  const [typed, setTyped] = useState(0); // chars typed on current line
+  const [exiting, setExiting] = useState(false);
+
+  // Typewriter timeline
+  useEffect(() => {
+    if (step >= lines.length) {
+      const t = setTimeout(() => setExiting(true), reduced ? 200 : 480);
+      return () => clearTimeout(t);
+    }
+    const line = lines[step];
+    if (typed < line.text.length) {
+      const speed = reduced ? 0 : (line.kind === 'cmd' ? 34 : 22) + Math.random() * 22;
+      const t = setTimeout(() => setTyped(c => c + 1), speed);
+      return () => clearTimeout(t);
+    }
+    // Line finished typing — brief pause, then advance
+    const t = setTimeout(() => { setStep(s => s + 1); setTyped(0); }, reduced ? 0 : 200);
+    return () => clearTimeout(t);
+  }, [step, typed, lines, reduced]);
+
+  // Fade-out → unmount (timeout matches CSS transition)
+  useEffect(() => {
+    if (!exiting) return;
+    const t = setTimeout(onDone, 650);
+    return () => clearTimeout(t);
+  }, [exiting, onDone]);
+
+  const completedChars =
+    lines.slice(0, step).reduce((sum, l) => sum + l.text.length, 0) + typed;
+  const pct = step >= lines.length
+    ? 100
+    : Math.round((completedChars / totalChars) * 100);
+
+  const renderLine = (line, idx, isCurrent) => {
+    const shown   = isCurrent ? line.text.slice(0, typed) : line.text;
+    const typing  = isCurrent && typed < line.text.length;
+    const finished = !typing;
+    return (
+      <div className={`boot-line boot-line--${line.kind}`} key={idx}>
+        <span className="boot-prompt">{line.prompt}</span>
+        <span className="boot-text">{shown}</span>
+        {isCurrent && <span className="boot-cursor" />}
+        {line.kind === 'task' && finished && (
+          <>
+            <span className="boot-leader" />
+            <span className={`boot-status${line.status === '⚡' ? ' boot-status--bolt' : ''}`}>
+              {line.status}
+            </span>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className={`boot-loader${exiting ? ' boot-loader--exiting' : ''}`} aria-hidden="true">
+      <div className="boot-terminal">
+        <div className="boot-bar">
+          <span className="t-dot t-dot--r" />
+          <span className="t-dot t-dot--y" />
+          <span className="t-dot t-dot--g" />
+          <span className="boot-bar-title">nav@portfolio:~/boot</span>
+        </div>
+        <div className="boot-body">
+          {lines.map((line, idx) => {
+            if (idx > step) return null;
+            return renderLine(line, idx, idx === step);
+          })}
+          <div className="boot-progress">
+            <div className="boot-progress-track">
+              <div className="boot-progress-fill" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="boot-progress-pct">{pct}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── App ── */
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -805,6 +910,15 @@ function App() {
   });
   const [transition, setTransition] = useState(null); // 'to-dark' | 'to-light' | null
   const [toggleActivating, setToggleActivating] = useState(false);
+  const [booting, setBooting] = useState(true);
+
+  // Lock scroll while the boot loader is on screen
+  useEffect(() => {
+    if (!booting) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [booting]);
 
   const toggleTheme = () => {
     if (transition) return;
@@ -910,6 +1024,7 @@ function App() {
 
   return (
     <div className={`portfolio${darkMode ? '' : ' light-mode'}`}>
+      {booting && <BootLoader darkMode={darkMode} onDone={() => setBooting(false)} />}
       <CursorTrail />
       {transition && (
         <SciFiTransition
