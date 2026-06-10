@@ -376,6 +376,26 @@ function SciFiTransition({ mode, onThemeChange, onComplete }) {
       };
     });
 
+    // ── Sun rays + dust motes (to-light sunrise) ──
+    // Origin is the bottom-right corner, so visible directions span left (π) to up (1.5π)
+    const RAYS = Array.from({ length: 14 }, (_, i) => ({
+      angle: Math.PI * (1.02 + (i / 13) * 0.46) + (Math.random() - 0.5) * 0.04,
+      width: 0.03 + Math.random() * 0.07,
+      alpha: 0.06 + Math.random() * 0.11,
+      phase: Math.random() * Math.PI * 2,
+      drift: 0.012 + Math.random() * 0.02,
+    }));
+
+    const MOTES = Array.from({ length: 70 }, () => ({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: 0.6 + Math.random() * 1.9,
+      vy: 0.12 + Math.random() * 0.28,
+      sway: 6 + Math.random() * 16,
+      phase: Math.random() * Math.PI * 2,
+      tw: 0.8 + Math.random() * 2.2,
+    }));
+
     // ── Lightning bolts — regenerated every ~65ms for flicker ──
     let bolts = [];
     let lastBoltMs = 0;
@@ -400,14 +420,6 @@ function SciFiTransition({ mode, onThemeChange, onComplete }) {
       });
     };
     regenBolts();
-
-    // ── Terminal lines (to-light) ──
-    const TERM = [
-      '> theme.compile("light")',
-      '> resolving: #edf2ff palette... ✓',
-      '> wiring:    lightning.css...  ⚡',
-      '> render()   complete          ✓',
-    ];
 
     let t0 = null;
     let themeFlipped = false;
@@ -447,7 +459,7 @@ function SciFiTransition({ mode, onThemeChange, onComplete }) {
 
       /* ── Burst sparks (both) ── */
       const burstT = Math.min(t / 0.45, 1);
-      const sc = mode === 'to-dark' ? '140,128,255' : '100,158,255';
+      const sc = mode === 'to-dark' ? '140,128,255' : '255,198,128';
       for (const p of SPARKS) {
         const dist = p.speed * easeOutCubicFn(burstT);
         const px   = OX + Math.cos(p.angle) * dist;
@@ -607,129 +619,134 @@ function SciFiTransition({ mode, onThemeChange, onComplete }) {
         }
 
       } else {
-        /* ══════════ COMPILE BURST ══════════ */
+        /* ══════════ SUNRISE BLOOM ══════════ */
 
         ctx.save();
         ctx.beginPath();
         ctx.arc(OX, OY, r, 0, Math.PI * 2);
         ctx.clip();
 
-        // Light blue background
-        ctx.fillStyle = '#edf2ff';
+        // Dawn sky: warm near the sun, cooling into the page background
+        const warmth = Math.max(0, 1 - t * 1.1); // hot colors settle as day breaks
+        const sky = ctx.createRadialGradient(OX, OY, 0, OX, OY, Math.max(r, 1));
+        sky.addColorStop(0,    '#fff8ea');
+        sky.addColorStop(0.16, `rgba(255,${232 - warmth * 24},${198 - warmth * 50},1)`);
+        sky.addColorStop(0.42, `rgba(250,${238 - warmth * 14},${230 - warmth * 26},1)`);
+        sky.addColorStop(0.75, '#eef0fb');
+        sky.addColorStop(1,    '#edf2ff');
+        ctx.fillStyle = sky;
         ctx.fillRect(0, 0, W, H);
 
-        // Grid
-        ctx.strokeStyle = 'rgba(70,110,255,0.07)';
-        ctx.lineWidth   = 0.6;
-        for (let gx = 0; gx < W; gx += 44) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
-        for (let gy = 0; gy < H; gy += 44) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+        // Volumetric god rays sweeping out of the sun
+        const rayIn = Math.min(t / 0.22, 1);
+        ctx.globalCompositeOperation = 'screen';
+        for (const ray of RAYS) {
+          const flicker = 0.55 + 0.45 * Math.sin(ts * 0.0011 + ray.phase);
+          const a = ray.alpha * flicker * rayIn;
+          if (a < 0.01) continue;
+          ctx.save();
+          ctx.translate(OX, OY);
+          ctx.rotate(ray.angle + Math.sin(ts * 0.00022 + ray.phase) * ray.drift);
+          const L = r * 1.05;
+          const g = ctx.createLinearGradient(0, 0, L, 0);
+          g.addColorStop(0,   `rgba(255,238,200,${a})`);
+          g.addColorStop(0.4, `rgba(255,230,185,${a * 0.5})`);
+          g.addColorStop(1,   'rgba(255,230,185,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(L, -L * ray.width);
+          ctx.lineTo(L,  L * ray.width);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.globalCompositeOperation = 'source-over';
 
-        // Floating code tokens drifting upward
-        ctx.font = `${CS}px "JetBrains Mono",monospace`;
-        const numTok = Math.floor(40 * Math.min(t * 3, 1));
-        for (let i = 0; i < numTok; i++) {
-          const seed = i * 97.3;
-          const lx   = (Math.sin(seed * 0.5) * 0.5 + 0.5) * W;
-          const ly   = (Math.cos(seed * 0.8) * 0.5 + 0.5) * H - t * 95;
-          if (Math.hypot(lx - OX, ly - OY) > r * 0.95) continue;
-          const tok  = CODE_TOKENS[i % CODE_TOKENS.length];
-          const tokA = 0.22 + 0.28 * Math.abs(Math.sin(ts * 0.004 + i));
-          ctx.fillStyle   = `rgba(91,114,255,${tokA})`;
-          ctx.shadowColor = '#5b72ff';
+        // Dust motes catching the light, drifting up with a gentle sway
+        for (const m of MOTES) {
+          m.y -= m.vy;
+          if (m.y < -4) { m.y = H + 4; m.x = Math.random() * W; }
+          const mx = m.x + Math.sin(ts * 0.0008 + m.phase) * m.sway * 0.3;
+          const dist = Math.hypot(mx - OX, m.y - OY);
+          if (dist > r) continue;
+          const twinkle = 0.5 + 0.5 * Math.sin(ts * 0.001 * m.tw + m.phase);
+          const a = (0.18 + 0.5 * twinkle) * (1 - (dist / MAX_R) * 0.6) * rayIn;
+          ctx.beginPath();
+          ctx.arc(mx, m.y, m.r, 0, Math.PI * 2);
+          ctx.fillStyle   = `rgba(255,246,224,${a})`;
+          ctx.shadowColor = '#ffe9c4';
           ctx.shadowBlur  = 4;
-          ctx.fillText(tok, lx, ly);
+          ctx.fill();
           ctx.shadowBlur  = 0;
         }
 
-        // Blue-white lightning bolts
-        if (t > 0.05 && t < 0.72) {
-          const bA = Math.min((t - 0.05) / 0.15, 1) * (1 - Math.max((t - 0.54) / 0.18, 0));
-          ctx.save();
-          ctx.globalAlpha = baseAlpha * bA;
-          for (const bolt of bolts) {
-            const pts = bolt.pts.filter(([bx, by]) => Math.hypot(bx - OX, by - OY) <= r);
-            if (pts.length < 2) continue;
-            drawBolt(pts, 9,   `rgba(80,140,255,${bolt.alpha * 0.22})`,  '#5b72ff', 22);
-            drawBolt(pts, 2.8, `rgba(140,190,255,${bolt.alpha * 0.65})`, '#88bbff', 12);
-            drawBolt(pts, 1.2, `rgba(220,235,255,${bolt.alpha * 0.95})`, '#c8e0ff', 5);
-          }
-          ctx.restore();
+        // Sun core — blinding at first, settling as the eye "adjusts"
+        const settle = 1 - t * 0.35;
+        const coreR  = (90 + Math.sin(ts * 0.003) * 6) * settle;
+        const sun = ctx.createRadialGradient(OX, OY, 0, OX, OY, coreR * 2.6);
+        sun.addColorStop(0,    `rgba(255,255,250,${0.95 * settle})`);
+        sun.addColorStop(0.22, `rgba(255,242,208,${0.6 * settle})`);
+        sun.addColorStop(0.55, `rgba(255,232,185,${0.22 * settle})`);
+        sun.addColorStop(1,    'rgba(255,232,185,0)');
+        ctx.fillStyle = sun;
+        ctx.beginPath();
+        ctx.arc(OX, OY, coreR * 2.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Anamorphic lens streaks (horizontal + vertical through the sun)
+        const streakA = 0.3 * rayIn * settle;
+        const sl = r * 0.85;
+        const hg = ctx.createLinearGradient(OX - sl, OY, OX, OY);
+        hg.addColorStop(0, 'rgba(255,245,220,0)');
+        hg.addColorStop(1, `rgba(255,245,220,${streakA})`);
+        ctx.fillStyle = hg;
+        ctx.fillRect(OX - sl, OY - 1.6, sl, 3.2);
+        const vg = ctx.createLinearGradient(OX, OY - sl, OX, OY);
+        vg.addColorStop(0, 'rgba(255,245,220,0)');
+        vg.addColorStop(1, `rgba(255,245,220,${streakA})`);
+        ctx.fillStyle = vg;
+        ctx.fillRect(OX - 1.6, OY - sl, 3.2, sl);
+
+        // Lens-flare ghosts along the diagonal toward screen center
+        const gvx = W * 0.3 - OX;
+        const gvy = H * 0.28 - OY;
+        for (const [f, gr2, ga] of [[0.22, 12, 0.1], [0.44, 20, 0.07], [0.7, 32, 0.05]]) {
+          const gx2 = OX + gvx * f;
+          const gy2 = OY + gvy * f;
+          if (Math.hypot(gx2 - OX, gy2 - OY) > r) continue;
+          const gg = ctx.createRadialGradient(gx2, gy2, 0, gx2, gy2, gr2);
+          gg.addColorStop(0,   `rgba(255,236,200,${ga * 1.3 * rayIn})`);
+          gg.addColorStop(0.7, `rgba(255,216,160,${ga * 0.5 * rayIn})`);
+          gg.addColorStop(1,   'rgba(255,216,160,0)');
+          ctx.fillStyle = gg;
+          ctx.beginPath();
+          ctx.arc(gx2, gy2, gr2, 0, Math.PI * 2);
+          ctx.fill();
         }
 
-        // Terminal compile output (typewriter)
-        if (t > 0.22 && t < 0.93) {
-          const tT  = (t - 0.22) / 0.71;
-          const tx2 = 32, ty2 = H * 0.18, lh = 22;
-          ctx.font = `13px "JetBrains Mono",monospace`;
-          for (let li = 0; li < TERM.length; li++) {
-            const ls = li / TERM.length;
-            const le = (li + 1) / TERM.length;
-            if (tT < ls) break;
-            const lt      = Math.min((tT - ls) / (le - ls), 1);
-            const visible = TERM[li].slice(0, Math.floor(lt * TERM[li].length));
-            const a       = Math.min(tT * 3.5, 0.82);
-            ctx.fillStyle   = `rgba(22,16,60,${a})`;
-            ctx.shadowColor = '#5b72ff';
-            ctx.shadowBlur  = li === TERM.length - 1 ? 7 : 0;
-            ctx.fillText(visible, tx2, ty2 + li * lh);
-            // Cursor on active line
-            const activeLine = Math.min(Math.floor(tT * TERM.length), TERM.length - 1);
-            if (li === activeLine && Math.floor(lt * TERM[li].length) < TERM[li].length) {
-              if (Math.floor(ts / 220) % 2 === 0) {
-                const cw = ctx.measureText(visible).width;
-                ctx.fillStyle = `rgba(91,114,255,${a})`;
-                ctx.fillRect(tx2 + cw, ty2 + li * lh - 13, 7, 14);
-              }
-            }
-          }
-          ctx.shadowBlur = 0;
-        }
-
-        // Blue-white compile flash at start
-        if (t < 0.13) {
-          ctx.fillStyle = `rgba(180,210,255,${(1 - t / 0.13) * 0.7})`;
+        // Initial over-exposed flash, like stepping outside
+        if (t < 0.14) {
+          ctx.fillStyle = `rgba(255,248,228,${(1 - t / 0.14) * 0.85})`;
           ctx.fillRect(0, 0, W, H);
         }
 
         ctx.restore();
 
-        // Sweeping blue scan lines
-        for (const [off, spd] of [[0, 0.85], [0.55, 0.6]]) {
-          const sy = ((t * spd + off) % 1) * H;
-          const sg = ctx.createLinearGradient(0, sy - 32, 0, sy + 32);
-          const sA = 0.18 * (1 - fadeT);
-          sg.addColorStop(0,    'rgba(91,114,255,0)');
-          sg.addColorStop(0.45, `rgba(91,114,255,${sA})`);
-          sg.addColorStop(0.5,  `rgba(180,205,255,${sA * 1.5})`);
-          sg.addColorStop(0.55, `rgba(91,114,255,${sA})`);
-          sg.addColorStop(1,    'rgba(91,114,255,0)');
-          ctx.fillStyle = sg;
-          ctx.fillRect(0, sy - 32, W, 64);
-        }
-
-        // Blue boundary ring
+        // Soft light bleeding ahead of the wavefront — no hard edge
         if (expandT < 1) {
-          const rw = Math.min(60, r * 0.12);
-          const gr = ctx.createRadialGradient(OX, OY, r - rw, OX, OY, r + 18);
-          const iA = 0.72 * (1 - expandT * 0.65);
-          gr.addColorStop(0,    'rgba(91,114,255,0)');
-          gr.addColorStop(0.3,  `rgba(91,114,255,${iA})`);
-          gr.addColorStop(0.65, `rgba(180,210,255,${iA * 1.3})`);
-          gr.addColorStop(1,    'rgba(91,114,255,0)');
+          const rw = Math.min(90, r * 0.22);
+          const gr = ctx.createRadialGradient(OX, OY, Math.max(r - rw, 0), OX, OY, r + 70);
+          const iA = 0.5 * (1 - expandT * 0.55);
+          gr.addColorStop(0,    'rgba(255,240,210,0)');
+          gr.addColorStop(0.5,  `rgba(255,240,210,${iA * 0.6})`);
+          gr.addColorStop(0.75, `rgba(255,252,240,${iA})`);
+          gr.addColorStop(1,    'rgba(255,240,210,0)');
           ctx.beginPath();
-          ctx.arc(OX, OY, r, 0, Math.PI * 2);
+          ctx.arc(OX, OY, r + 8, 0, Math.PI * 2);
           ctx.strokeStyle = gr;
-          ctx.lineWidth   = rw + 8;
+          ctx.lineWidth   = rw + 70;
           ctx.stroke();
-          // Dashed outer arc
-          ctx.beginPath();
-          ctx.arc(OX, OY, r + 20, 0, Math.PI * 2);
-          ctx.strokeStyle    = `rgba(100,160,255,${0.3 * (1 - expandT)})`;
-          ctx.lineWidth      = 1.5;
-          ctx.setLineDash([6, 14]);
-          ctx.lineDashOffset = ts * 0.14;
-          ctx.stroke();
-          ctx.setLineDash([]);
         }
       }
 
@@ -1331,7 +1348,6 @@ function App() {
         <div className="footer-links">
           <a href="https://github.com/navv-r" target="_blank" rel="noreferrer">GitHub</a>
           <a href="https://linkedin.com" target="_blank" rel="noreferrer">LinkedIn</a>
-          <a href="https://twitter.com" target="_blank" rel="noreferrer">Twitter</a>
         </div>
       </footer>
     </div>
