@@ -1,22 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import emailjs from '@emailjs/browser';
+import { useEffect, useRef, useState } from 'react';
 import {
   SiHtml5, SiCss, SiJavascript, SiTypescript,
   SiReact, SiNextdotjs, SiRedux, SiNodedotjs,
 } from 'react-icons/si';
+import { FiMail, FiGithub, FiLinkedin, FiSun, FiMoon, FiArrowUpRight } from 'react-icons/fi';
 import './App.css';
 
-/* ── EmailJS config — replace these three values ── */
-const EJS_SERVICE_ID  = 'service_g1pstsc';
-const EJS_TEMPLATE_ID = 'template_qhlj3ro';
-const EJS_PUBLIC_KEY  = 'VwH5xvKzzdxR_BhUd';
+/* ── Links ── */
+const EMAIL        = 'navendra604@gmail.com';
+const LINKEDIN_URL = 'https://www.linkedin.com/in/navendra-ramdhan/';
+const GITHUB_URL   = 'https://github.com/navv-r';
+const MAILTO       = `mailto:${EMAIL}?subject=${encodeURIComponent("Hi Navendra — let's connect")}`;
 
 /* ── Project data ── */
 const PROJECTS = [
   {
     title: 'Summarist Internship',
     desc: 'A Next.js audiobook platform with user authentication, book browsing, personal collections, in-app audio playback, and a premium subscription tier.',
-    color: '#2dc96e',
+    color: '#7da96a',
     label: 'Summarist',
     link: 'https://advanced-tech-internship.vercel.app/',
     image: '/summarist.png',
@@ -24,7 +25,7 @@ const PROJECTS = [
   {
     title: 'NFT Marketplace Internship',
     desc: 'A React-based NFT auction platform where users can browse trending and personalised listings, place bids, and track live countdown timers showing each NFT\'s remaining availability.',
-    color: '#7c5cbf',
+    color: '#4d82ff',
     label: 'NFT Market',
     link: 'https://navendra-internship.vercel.app/',
     image: '/nft.png',
@@ -32,7 +33,7 @@ const PROJECTS = [
   {
     title: 'Movie Finder Clone Project',
     desc: 'A vanilla JavaScript movie search app that lets users find any film by title or keyword, with a sorting dropdown for quick and easy browsing.',
-    color: '#9e9e9e',
+    color: '#5fa8a0',
     label: 'Movie Finder',
     link: 'https://react-final-project-ruddy-five.vercel.app/',
     image: '/movie.png',
@@ -40,7 +41,7 @@ const PROJECTS = [
   {
     title: 'Skinstric Internship',
     desc: 'An AI-powered skincare platform built in React with Tailwind CSS. Users capture or upload a photo and receive demographic, gender, and age analysis via an AI endpoint API.',
-    color: '#c8c8c8',
+    color: '#6c9bd1',
     label: 'Skinstric',
     link: 'https://skinstric-internship-pi.vercel.app',
     image: '/skinstric.png',
@@ -55,7 +56,59 @@ const PROJECTS = [
   },
 ];
 
-/* ── Cursor trail ── */
+/* ── Tech stack data ── */
+const STACK = [
+  { label: 'HTML',       icon: <SiHtml5      color="#e34f26" /> },
+  { label: 'CSS',        icon: <SiCss        color="#1572b6" /> },
+  { label: 'JavaScript', icon: <SiJavascript color="#f7df1e" /> },
+  { label: 'TypeScript', icon: <SiTypescript color="#3178c6" /> },
+  { label: 'React',      icon: <SiReact      color="#61dafb" /> },
+  { label: 'Next.js',    icon: <SiNextdotjs  className="icon-nextjs" /> },
+  { label: 'Redux',      icon: <SiRedux      color="#764abc" /> },
+  { label: 'Node.js',    icon: <SiNodedotjs  color="#3c873a" /> },
+];
+
+/* ── 2s Loading screen ── */
+const LOAD_MS = 2000;
+
+function Loader({ onDone }) {
+  const [pct, setPct] = useState(0);
+  const [exiting, setExiting] = useState(false);
+
+  useEffect(() => {
+    let raf;
+    const start = performance.now();
+    const tick = (now) => {
+      const p = Math.min((now - start) / LOAD_MS, 1);
+      setPct(Math.round(p * 100));
+      if (p < 1) raf = requestAnimationFrame(tick);
+      else setExiting(true);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  useEffect(() => {
+    if (!exiting) return;
+    const t = setTimeout(onDone, 550);
+    return () => clearTimeout(t);
+  }, [exiting, onDone]);
+
+  return (
+    <div className={`loader${exiting ? ' loader--exit' : ''}`} aria-hidden="true">
+      <div className="loader-inner">
+        <div className="loader-mark">&lt;NR /&gt;</div>
+        <div className="loader-line">initializing portfolio<span className="loader-dots" /></div>
+        <div className="loader-bar">
+          <div className="loader-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <div className="loader-pct">{pct}%</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Modest cursor trail ── */
 function CursorTrail() {
   const canvasRef = useRef(null);
 
@@ -64,7 +117,6 @@ function CursorTrail() {
     const ctx = canvas.getContext('2d');
     let animId;
     let particles = [];
-    let mouse = { x: -200, y: -200 };
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -73,88 +125,36 @@ function CursorTrail() {
     resize();
     window.addEventListener('resize', resize);
 
-    const COLORS = ['#6c63ff', '#00b894', '#a29bfe', '#00cec9', '#fd79a8'];
+    const COLORS = ['#4d82ff', '#9cb88a'];
+    let tickCount = 0;
 
     const onMove = (e) => {
-      const x = e.clientX;
-      const y = e.clientY;
-      mouse = { x, y };
-      for (let i = 0; i < 3; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 1.2;
-        const size = Math.random() * 3 + 1;
-        const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-        const type = Math.random() < 0.3 ? 'hex' : 'dot';
-        particles.push({
-          x, y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - 0.5,
-          life: 1,
-          decay: Math.random() * 0.025 + 0.018,
-          size, color, type,
-          rotation: Math.random() * Math.PI * 2,
-          rotSpeed: (Math.random() - 0.5) * 0.12,
-        });
-      }
+      tickCount++;
+      if (tickCount % 2 !== 0) return; // thin it out — modest, not a comet
+      particles.push({
+        x: e.clientX,
+        y: e.clientY,
+        size: Math.random() * 2 + 1.2,
+        life: 1,
+        decay: Math.random() * 0.02 + 0.03,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      });
+      if (particles.length > 60) particles.splice(0, particles.length - 60);
     };
     window.addEventListener('mousemove', onMove);
 
-    const onTouch = (e) => {
-      const touch = e.touches[0];
-      if (!touch) return;
-      onMove({ clientX: touch.clientX, clientY: touch.clientY });
-    };
-    window.addEventListener('touchmove', onTouch, { passive: true });
-
-    const drawHex = (ctx, x, y, r) => {
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = (Math.PI / 3) * i;
-        i === 0 ? ctx.moveTo(x + r * Math.cos(a), y + r * Math.sin(a))
-                : ctx.lineTo(x + r * Math.cos(a), y + r * Math.sin(a));
-      }
-      ctx.closePath();
-    };
-
     const loop = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const grad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 18);
-      grad.addColorStop(0, 'rgba(108,99,255,0.35)');
-      grad.addColorStop(1, 'rgba(108,99,255,0)');
-      ctx.beginPath();
-      ctx.arc(mouse.x, mouse.y, 18, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(mouse.x, mouse.y, 3, 0, Math.PI * 2);
-      ctx.fillStyle = '#a29bfe';
-      ctx.fill();
-
       particles = particles.filter(p => p.life > 0);
       for (const p of particles) {
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, p.life);
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation);
-        if (p.type === 'hex') {
-          drawHex(ctx, 0, 0, p.size * 2);
-          ctx.strokeStyle = p.color;
-          ctx.lineWidth = 0.8;
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 6;
-          ctx.stroke();
-        } else {
-          ctx.beginPath();
-          ctx.arc(0, 0, p.size, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 10;
-          ctx.fill();
-        }
-        ctx.restore();
-        p.x += p.vx; p.y += p.vy; p.vy += 0.02;
-        p.life -= p.decay; p.rotation += p.rotSpeed; p.size *= 0.97;
+        ctx.globalAlpha = Math.max(0, p.life * 0.55);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+        p.life -= p.decay;
       }
+      ctx.globalAlpha = 1;
       animId = requestAnimationFrame(loop);
     };
     loop();
@@ -162,7 +162,6 @@ function CursorTrail() {
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('touchmove', onTouch);
       window.removeEventListener('resize', resize);
     };
   }, []);
@@ -170,7 +169,7 @@ function CursorTrail() {
   return <canvas ref={canvasRef} className="cursor-canvas" />;
 }
 
-/* ── Type Once ── */
+/* ── Typewriter (types once, keeps blinking cursor while typing) ── */
 function TypeOnce({ text: fullText, speed = 60 }) {
   const [displayed, setDisplayed] = useState('');
   const [done, setDone] = useState(false);
@@ -190,7 +189,7 @@ function TypeOnce({ text: fullText, speed = 60 }) {
   );
 }
 
-/* ── Scramble label ── */
+/* ── Scramble label (hover) ── */
 const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&';
 
 function ScrambleLabel({ text }) {
@@ -225,53 +224,10 @@ function ScrambleLabel({ text }) {
   );
 }
 
-/* ── Letter fly animation ── */
-function LetterFly() {
-  return (
-    <div className="letter-stage">
-      {[...Array(8)].map((_, i) => (
-        <div
-          key={i}
-          className="speed-streak"
-          style={{
-            top: `${56 + (i - 4) * 5}%`,
-            animationDelay: `${0.22 + i * 0.04}s`,
-            width: `${30 + Math.round(Math.sin(i) * 15 + 20)}%`,
-            opacity: 0.4 + (i % 3) * 0.15,
-          }}
-        />
-      ))}
-      <div className="letter-envelope">
-        <div className="letter-glow" />
-        <svg width="76" height="60" viewBox="0 0 76 60" fill="none">
-          {/* Body */}
-          <rect x="1" y="16" width="74" height="43" rx="5" fill="var(--surface)" stroke="#6c63ff" strokeWidth="1.8"/>
-          {/* Bottom left fold */}
-          <line x1="1" y1="59" x2="34" y2="37" stroke="#6c63ff" strokeWidth="1.2" strokeOpacity="0.4"/>
-          {/* Bottom right fold */}
-          <line x1="75" y1="59" x2="42" y2="37" stroke="#6c63ff" strokeWidth="1.2" strokeOpacity="0.4"/>
-          {/* Flap crease */}
-          <path d="M1 16 L38 38 L75 16" fill="none" stroke="#6c63ff" strokeWidth="1.8"/>
-          {/* Open flap */}
-          <path className="envelope-flap" d="M1 16 L38 1 L75 16" fill="#6c63ff" fillOpacity="0.18" stroke="#6c63ff" strokeWidth="1.8"/>
-          {/* Wax seal */}
-          <circle cx="38" cy="37" r="6" fill="#6c63ff" fillOpacity="0.45"/>
-          <circle cx="38" cy="37" r="3" fill="#a29bfe"/>
-        </svg>
-        {/* Dotted trail */}
-        <div className="letter-trail">
-          {[...Array(7)].map((_, i) => (
-            <div key={i} className="trail-dot" style={{ animationDelay: `${i * 0.06}s` }} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ── Scroll reveal ── */
-function useScrollReveal() {
+function useScrollReveal(active) {
   useEffect(() => {
+    if (!active) return;
     const observer = new IntersectionObserver(
       entries => entries.forEach(entry => {
         if (entry.isIntersecting) entry.target.classList.add('visible');
@@ -280,7 +236,7 @@ function useScrollReveal() {
     );
     document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
     return () => observer.disconnect();
-  }, []);
+  }, [active]);
 }
 
 /* ── CountUp ── */
@@ -312,611 +268,113 @@ function CountUp({ target, duration }) {
   return <span ref={ref}>{count}+</span>;
 }
 
-/* ── Lightning Name ── */
-function zigzag(x1, y1, x2, y2, segs, spread) {
-  const pts = [[x1, y1]];
-  for (let i = 1; i < segs; i++) {
-    pts.push([
-      x1 + (x2 - x1) * (i / segs) + (Math.random() - 0.5) * spread,
-      y1 + (y2 - y1) * (i / segs),
-    ]);
-  }
-  pts.push([x2, y2]);
-  return pts;
-}
-
-/* ── Lightning + Code Theme Transition ── */
-const ANIM_DURATION = 1350;
-const CODE_CHARS  = '{}()[]<>=!&|/;:.,01#@$%~^*+-'.split('');
-const CODE_TOKENS = ['const','let','fn','if','for','while','return','class',
-                     '=>','===','!==','&&','||','...','/**','*/','//',
-                     '0x1f','null','true','false','⚡','λ','#!','>>','<<'];
-
-function easeOutCubicFn(t) { return 1 - Math.pow(1 - t, 3); }
-function easeInCubicFn(t)  { return t * t * t; }
-
-function SciFiTransition({ mode, onThemeChange, onComplete }) {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-
-    const W = (canvas.width  = window.innerWidth);
-    const H = (canvas.height = window.innerHeight);
-
-    // Toggle button center (fixed bottom-right)
-    const OX = W - 48;
-    const OY = H - 48;
-    const MAX_R = Math.hypot(W, H) * 1.08;
-
-    // ── Code rain drops ──
-    const CS   = Math.max(11, Math.min(15, W / 65));
-    const COLS = Math.ceil(W / CS);
-    const drops = Array.from({ length: COLS }, () => -(Math.random() * H * 0.6));
-
-    // ── Burst sparks ──
-    const SPARKS = Array.from({ length: 60 }, () => ({
-      angle: Math.random() * Math.PI * 2,
-      speed: 80 + Math.random() * 480,
-      r    : 1 + Math.random() * 2.5,
-    }));
-
-    // ── Circuit traces (rectilinear L-shapes from origin) ──
-    const TRACES = Array.from({ length: 22 }, () => {
-      const ex = Math.random() * W;
-      const ey = Math.random() * H;
-      return {
-        // L-shape: origin → (ex, OY) → (ex, ey)
-        ex, ey,
-        len  : Math.abs(ex - OX) + Math.abs(ey - OY),
-        speed: 0.28 + Math.random() * 0.45,
-        delay: Math.random() * 0.28,
-      };
-    });
-
-    // ── Sun rays + dust motes (to-light sunrise) ──
-    // Origin is the bottom-right corner, so visible directions span left (π) to up (1.5π)
-    const RAYS = Array.from({ length: 14 }, (_, i) => ({
-      angle: Math.PI * (1.02 + (i / 13) * 0.46) + (Math.random() - 0.5) * 0.04,
-      width: 0.03 + Math.random() * 0.07,
-      alpha: 0.06 + Math.random() * 0.11,
-      phase: Math.random() * Math.PI * 2,
-      drift: 0.012 + Math.random() * 0.02,
-    }));
-
-    const MOTES = Array.from({ length: 70 }, () => ({
-      x: Math.random() * W,
-      y: Math.random() * H,
-      r: 0.6 + Math.random() * 1.9,
-      vy: 0.12 + Math.random() * 0.28,
-      sway: 6 + Math.random() * 16,
-      phase: Math.random() * Math.PI * 2,
-      tw: 0.8 + Math.random() * 2.2,
-    }));
-
-    // ── Lightning bolts — regenerated every ~65ms for flicker ──
-    let bolts = [];
-    let lastBoltMs = 0;
-    const regenBolts = () => {
-      const count = mode === 'to-dark' ? 6 : 5;
-      bolts = Array.from({ length: count }, () => {
-        const side = Math.floor(Math.random() * 4);
-        let tx, ty;
-        if      (side === 0) { tx = Math.random() * W; ty = 0; }
-        else if (side === 1) { tx = W; ty = Math.random() * H; }
-        else if (side === 2) { tx = Math.random() * W; ty = H; }
-        else                 { tx = 0; ty = Math.random() * H; }
-        // Occasionally short inner bolts
-        if (Math.random() < 0.35) {
-          tx = OX + (Math.random() - 0.5) * W * 0.7;
-          ty = OY + (Math.random() - 0.5) * H * 0.7;
-        }
-        return {
-          pts  : zigzag(OX, OY, tx, ty, 10 + Math.floor(Math.random() * 7), 38),
-          alpha: 0.45 + Math.random() * 0.55,
-        };
-      });
-    };
-    regenBolts();
-
-    let t0 = null;
-    let themeFlipped = false;
-    let rafId;
-
-    const drawBolt = (pts, lw, color, glow, glowBlur) => {
-      if (pts.length < 2) return;
-      ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-      ctx.lineWidth   = lw;
-      ctx.strokeStyle = color;
-      ctx.shadowColor = glow;
-      ctx.shadowBlur  = glowBlur;
-      ctx.lineCap     = 'round';
-      ctx.lineJoin    = 'round';
-      ctx.stroke();
-      ctx.shadowBlur  = 0;
-    };
-
-    const frame = (ts) => {
-      if (!t0) t0 = ts;
-      const t = Math.min((ts - t0) / ANIM_DURATION, 1);
-
-      if (!themeFlipped && t >= 0.42) { themeFlipped = true; onThemeChange(); }
-
-      // Regen bolts every 65ms
-      if (ts - lastBoltMs > 65) { lastBoltMs = ts; regenBolts(); }
-
-      ctx.clearRect(0, 0, W, H);
-
-      const expandT  = Math.min(t / 0.62, 1);
-      const r        = MAX_R * easeOutCubicFn(expandT);
-      const fadeT    = t > 0.72 ? (t - 0.72) / 0.28 : 0;
-      const baseAlpha = Math.max(0, 1 - easeInCubicFn(fadeT));
-      ctx.globalAlpha = baseAlpha;
-
-      /* ── Burst sparks (both) ── */
-      const burstT = Math.min(t / 0.45, 1);
-      const sc = mode === 'to-dark' ? '140,128,255' : '255,198,128';
-      for (const p of SPARKS) {
-        const dist = p.speed * easeOutCubicFn(burstT);
-        const px   = OX + Math.cos(p.angle) * dist;
-        const py   = OY + Math.sin(p.angle) * dist;
-        const a    = (1 - burstT) * 0.88;
-        if (a < 0.02) continue;
-        ctx.beginPath();
-        ctx.arc(px, py, p.r * (1 - burstT * 0.4), 0, Math.PI * 2);
-        ctx.fillStyle   = `rgba(${sc},${a})`;
-        ctx.shadowColor = `rgb(${sc})`;
-        ctx.shadowBlur  = 7;
-        ctx.fill();
-        ctx.shadowBlur  = 0;
-      }
-
-      if (mode === 'to-dark') {
-        /* ══════════ LIGHTNING STORM COLLAPSE ══════════ */
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(OX, OY, r, 0, Math.PI * 2);
-        ctx.clip();
-
-        // Dark void background
-        ctx.fillStyle = '#0a0a0f';
-        ctx.fillRect(0, 0, W, H);
-
-        // Circuit-board L-traces growing from origin
-        for (const tr of TRACES) {
-          if (t < tr.delay) continue;
-          const tp  = Math.min((t - tr.delay) / tr.speed, 1);
-          if (tp <= 0) continue;
-          const drawn = tp * tr.len;
-          const seg1  = Math.abs(tr.ex - OX);
-          const seg2  = Math.abs(tr.ey - OY);
-
-          ctx.beginPath();
-          ctx.moveTo(OX, OY);
-          if (drawn <= seg1) {
-            ctx.lineTo(OX + (tr.ex - OX) * (drawn / (seg1 || 1)), OY);
-          } else {
-            ctx.lineTo(tr.ex, OY);
-            const rem = drawn - seg1;
-            ctx.lineTo(tr.ex, OY + (tr.ey - OY) * Math.min(rem / (seg2 || 1), 1));
-          }
-          const trA = 0.55 * Math.sin(tp * Math.PI);
-          ctx.strokeStyle = `rgba(108,99,255,${trA})`;
-          ctx.lineWidth   = 0.85;
-          ctx.shadowColor = '#6c63ff';
-          ctx.shadowBlur  = 5;
-          ctx.stroke();
-          ctx.shadowBlur  = 0;
-
-          // Travelling dot at the head
-          if (tp < 0.99) {
-            let hx, hy;
-            if (drawn <= seg1) {
-              hx = OX + (tr.ex - OX) * (drawn / (seg1 || 1));
-              hy = OY;
-            } else {
-              hx = tr.ex;
-              hy = OY + (tr.ey - OY) * Math.min((drawn - seg1) / (seg2 || 1), 1);
-            }
-            ctx.beginPath();
-            ctx.arc(hx, hy, 2.2, 0, Math.PI * 2);
-            ctx.fillStyle   = `rgba(200,195,255,${trA * 1.4})`;
-            ctx.shadowColor = '#aaddff';
-            ctx.shadowBlur  = 8;
-            ctx.fill();
-            ctx.shadowBlur  = 0;
-          }
-        }
-
-        // Syntax code rain
-        ctx.font = `${CS}px "JetBrains Mono",monospace`;
-        const rainA = Math.min(t * 3, 1) * 0.9;
-        for (let i = 0; i < COLS; i++) {
-          const cx2 = i * CS;
-          if (drops[i] < -CS || drops[i] > H + CS) { drops[i] += CS * 0.5; continue; }
-          const useWord = Math.random() < 0.1;
-          const ch = useWord
-            ? CODE_TOKENS[Math.floor(Math.random() * CODE_TOKENS.length)]
-            : CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
-          if (Math.hypot(cx2 + CS / 2 - OX, drops[i] - OY) <= r) {
-            ctx.fillStyle = `rgba(220,210,255,${rainA})`;
-            ctx.fillText(ch, cx2, drops[i]);
-            for (let j = 1; j <= 6; j++) {
-              const ty2 = drops[i] - j * CS;
-              if (ty2 < 0 || Math.hypot(cx2 + CS / 2 - OX, ty2 - OY) > r) continue;
-              const tc = CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
-              const ta = (1 - j / 7) * rainA * (j === 1 ? 0.7 : j === 2 ? 0.45 : 0.22);
-              ctx.fillStyle = j <= 2
-                ? `rgba(162,155,254,${ta})`
-                : `rgba(108,99,255,${ta})`;
-              ctx.fillText(tc, cx2, ty2);
-            }
-          }
-          drops[i] += CS * 0.52;
-          if (drops[i] > H + CS * 5) drops[i] = -(CS * (2 + Math.random() * 5));
-        }
-
-        // Lightning bolts radiating from origin
-        if (t > 0.04 && t < 0.78) {
-          const bA = Math.min((t - 0.04) / 0.18, 1) * (1 - Math.max((t - 0.58) / 0.2, 0));
-          ctx.save();
-          ctx.globalAlpha = baseAlpha * bA;
-          for (const bolt of bolts) {
-            const pts = bolt.pts.filter(([bx, by]) => Math.hypot(bx - OX, by - OY) <= r);
-            if (pts.length < 2) continue;
-            drawBolt(pts, 7,   `rgba(108,99,255,${bolt.alpha * 0.25})`, '#6c63ff', 18);
-            drawBolt(pts, 2.5, `rgba(162,155,254,${bolt.alpha * 0.7})`, '#a09bfe', 10);
-            drawBolt(pts, 1,   `rgba(220,215,255,${bolt.alpha * 0.95})`, '#c8c4ff', 5);
-          }
-          ctx.restore();
-        }
-
-        // Initial purple flash
-        if (t < 0.1) {
-          ctx.fillStyle = `rgba(180,170,255,${(1 - t / 0.1) * 0.75})`;
-          ctx.fillRect(0, 0, W, H);
-        }
-
-        ctx.restore();
-
-        // Purple crackling boundary ring
-        if (expandT < 1) {
-          const rw = Math.min(55, r * 0.12);
-          const gr = ctx.createRadialGradient(OX, OY, r - rw, OX, OY, r + 12);
-          const iA = 0.68 * (1 - expandT * 0.7);
-          gr.addColorStop(0,    'rgba(108,99,255,0)');
-          gr.addColorStop(0.35, `rgba(108,99,255,${iA})`);
-          gr.addColorStop(0.72, `rgba(200,195,255,${iA * 1.35})`);
-          gr.addColorStop(1,    'rgba(108,99,255,0)');
-          ctx.beginPath();
-          ctx.arc(OX, OY, r, 0, Math.PI * 2);
-          ctx.strokeStyle = gr;
-          ctx.lineWidth   = rw + 10;
-          ctx.stroke();
-          // Dashed lightning arc
-          ctx.beginPath();
-          ctx.arc(OX, OY, r + 17, 0, Math.PI * 2);
-          ctx.strokeStyle    = `rgba(162,155,254,${0.38 * (1 - expandT)})`;
-          ctx.lineWidth      = 2;
-          ctx.setLineDash([4, 10]);
-          ctx.lineDashOffset = -ts * 0.14;
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-
-        // Outside: glitch scanlines
-        if (expandT < 0.95) {
-          for (let g = 0, ng = Math.floor(5 * t); g < ng; g++) {
-            const gy = (H * (g + 1)) / (ng + 1) + Math.sin(ts * 0.02 + g) * 10;
-            ctx.fillStyle = `rgba(108,99,255,${0.09 * Math.random()})`;
-            ctx.fillRect(Math.sin(ts * 0.01 + g) * 28, gy, W * (0.08 + 0.32 * Math.random()), 1.5);
-          }
-        }
-
-      } else {
-        /* ══════════ SUNRISE BLOOM ══════════ */
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(OX, OY, r, 0, Math.PI * 2);
-        ctx.clip();
-
-        // Dawn sky: warm near the sun, cooling into the page background
-        const warmth = Math.max(0, 1 - t * 1.1); // hot colors settle as day breaks
-        const sky = ctx.createRadialGradient(OX, OY, 0, OX, OY, Math.max(r, 1));
-        sky.addColorStop(0,    '#fff8ea');
-        sky.addColorStop(0.16, `rgba(255,${232 - warmth * 24},${198 - warmth * 50},1)`);
-        sky.addColorStop(0.42, `rgba(250,${238 - warmth * 14},${230 - warmth * 26},1)`);
-        sky.addColorStop(0.75, '#eef0fb');
-        sky.addColorStop(1,    '#edf2ff');
-        ctx.fillStyle = sky;
-        ctx.fillRect(0, 0, W, H);
-
-        // Volumetric god rays sweeping out of the sun
-        const rayIn = Math.min(t / 0.22, 1);
-        ctx.globalCompositeOperation = 'screen';
-        for (const ray of RAYS) {
-          const flicker = 0.55 + 0.45 * Math.sin(ts * 0.0011 + ray.phase);
-          const a = ray.alpha * flicker * rayIn;
-          if (a < 0.01) continue;
-          ctx.save();
-          ctx.translate(OX, OY);
-          ctx.rotate(ray.angle + Math.sin(ts * 0.00022 + ray.phase) * ray.drift);
-          const L = r * 1.05;
-          const g = ctx.createLinearGradient(0, 0, L, 0);
-          g.addColorStop(0,   `rgba(255,238,200,${a})`);
-          g.addColorStop(0.4, `rgba(255,230,185,${a * 0.5})`);
-          g.addColorStop(1,   'rgba(255,230,185,0)');
-          ctx.fillStyle = g;
-          ctx.beginPath();
-          ctx.moveTo(0, 0);
-          ctx.lineTo(L, -L * ray.width);
-          ctx.lineTo(L,  L * ray.width);
-          ctx.closePath();
-          ctx.fill();
-          ctx.restore();
-        }
-        ctx.globalCompositeOperation = 'source-over';
-
-        // Dust motes catching the light, drifting up with a gentle sway
-        for (const m of MOTES) {
-          m.y -= m.vy;
-          if (m.y < -4) { m.y = H + 4; m.x = Math.random() * W; }
-          const mx = m.x + Math.sin(ts * 0.0008 + m.phase) * m.sway * 0.3;
-          const dist = Math.hypot(mx - OX, m.y - OY);
-          if (dist > r) continue;
-          const twinkle = 0.5 + 0.5 * Math.sin(ts * 0.001 * m.tw + m.phase);
-          const a = (0.18 + 0.5 * twinkle) * (1 - (dist / MAX_R) * 0.6) * rayIn;
-          ctx.beginPath();
-          ctx.arc(mx, m.y, m.r, 0, Math.PI * 2);
-          ctx.fillStyle   = `rgba(255,246,224,${a})`;
-          ctx.shadowColor = '#ffe9c4';
-          ctx.shadowBlur  = 4;
-          ctx.fill();
-          ctx.shadowBlur  = 0;
-        }
-
-        // Sun core — blinding at first, settling as the eye "adjusts"
-        const settle = 1 - t * 0.35;
-        const coreR  = (90 + Math.sin(ts * 0.003) * 6) * settle;
-        const sun = ctx.createRadialGradient(OX, OY, 0, OX, OY, coreR * 2.6);
-        sun.addColorStop(0,    `rgba(255,255,250,${0.95 * settle})`);
-        sun.addColorStop(0.22, `rgba(255,242,208,${0.6 * settle})`);
-        sun.addColorStop(0.55, `rgba(255,232,185,${0.22 * settle})`);
-        sun.addColorStop(1,    'rgba(255,232,185,0)');
-        ctx.fillStyle = sun;
-        ctx.beginPath();
-        ctx.arc(OX, OY, coreR * 2.6, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Anamorphic lens streaks (horizontal + vertical through the sun)
-        const streakA = 0.3 * rayIn * settle;
-        const sl = r * 0.85;
-        const hg = ctx.createLinearGradient(OX - sl, OY, OX, OY);
-        hg.addColorStop(0, 'rgba(255,245,220,0)');
-        hg.addColorStop(1, `rgba(255,245,220,${streakA})`);
-        ctx.fillStyle = hg;
-        ctx.fillRect(OX - sl, OY - 1.6, sl, 3.2);
-        const vg = ctx.createLinearGradient(OX, OY - sl, OX, OY);
-        vg.addColorStop(0, 'rgba(255,245,220,0)');
-        vg.addColorStop(1, `rgba(255,245,220,${streakA})`);
-        ctx.fillStyle = vg;
-        ctx.fillRect(OX - 1.6, OY - sl, 3.2, sl);
-
-        // Lens-flare ghosts along the diagonal toward screen center
-        const gvx = W * 0.3 - OX;
-        const gvy = H * 0.28 - OY;
-        for (const [f, gr2, ga] of [[0.22, 12, 0.1], [0.44, 20, 0.07], [0.7, 32, 0.05]]) {
-          const gx2 = OX + gvx * f;
-          const gy2 = OY + gvy * f;
-          if (Math.hypot(gx2 - OX, gy2 - OY) > r) continue;
-          const gg = ctx.createRadialGradient(gx2, gy2, 0, gx2, gy2, gr2);
-          gg.addColorStop(0,   `rgba(255,236,200,${ga * 1.3 * rayIn})`);
-          gg.addColorStop(0.7, `rgba(255,216,160,${ga * 0.5 * rayIn})`);
-          gg.addColorStop(1,   'rgba(255,216,160,0)');
-          ctx.fillStyle = gg;
-          ctx.beginPath();
-          ctx.arc(gx2, gy2, gr2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // Initial over-exposed flash, like stepping outside
-        if (t < 0.14) {
-          ctx.fillStyle = `rgba(255,248,228,${(1 - t / 0.14) * 0.85})`;
-          ctx.fillRect(0, 0, W, H);
-        }
-
-        ctx.restore();
-
-        // Soft light bleeding ahead of the wavefront — no hard edge
-        if (expandT < 1) {
-          const rw = Math.min(90, r * 0.22);
-          const gr = ctx.createRadialGradient(OX, OY, Math.max(r - rw, 0), OX, OY, r + 70);
-          const iA = 0.5 * (1 - expandT * 0.55);
-          gr.addColorStop(0,    'rgba(255,240,210,0)');
-          gr.addColorStop(0.5,  `rgba(255,240,210,${iA * 0.6})`);
-          gr.addColorStop(0.75, `rgba(255,252,240,${iA})`);
-          gr.addColorStop(1,    'rgba(255,240,210,0)');
-          ctx.beginPath();
-          ctx.arc(OX, OY, r + 8, 0, Math.PI * 2);
-          ctx.strokeStyle = gr;
-          ctx.lineWidth   = rw + 70;
-          ctx.stroke();
-        }
-      }
-
-      ctx.globalAlpha = 1;
-
-      if (t < 1) {
-        rafId = requestAnimationFrame(frame);
-      } else {
-        onComplete();
-      }
-    };
-
-    rafId = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(rafId);
-  }, [mode, onThemeChange, onComplete]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: 'fixed',
-        top: 0, left: 0,
-        width: '100vw',
-        height: '100vh',
-        pointerEvents: 'none',
-        zIndex: 99998,
-      }}
-    />
-  );
-}
-
-/* ── Theme toggle button ── */
-function ThemeToggle({ darkMode, onToggle, activating }) {
+/* ── Theme toggle — simple icon morph, colors cross-fade via CSS ── */
+function ThemeToggle({ darkMode, onToggle }) {
   return (
     <button
-      className={`theme-toggle${activating ? ' theme-toggle--activating' : ''}`}
+      className="theme-toggle"
       onClick={onToggle}
       aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
       title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      {darkMode ? (
-        /* Sun icon — shown in dark mode to switch to light */
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="4" />
-          <line x1="12" y1="2"  x2="12" y2="5" />
-          <line x1="12" y1="19" x2="12" y2="22" />
-          <line x1="4.22" y1="4.22"  x2="6.34" y2="6.34" />
-          <line x1="17.66" y1="17.66" x2="19.78" y2="19.78" />
-          <line x1="2"  y1="12" x2="5"  y2="12" />
-          <line x1="19" y1="12" x2="22" y2="12" />
-          <line x1="4.22" y1="19.78" x2="6.34" y2="17.66" />
-          <line x1="17.66" y1="6.34" x2="19.78" y2="4.22" />
-        </svg>
-      ) : (
-        /* Crescent moon icon — shown in light mode to switch to dark */
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
-        </svg>
-      )}
+      <span className="toggle-icons">
+        <FiSun className="toggle-icon toggle-icon--sun" />
+        <FiMoon className="toggle-icon toggle-icon--moon" />
+      </span>
     </button>
   );
 }
 
-/* ── Boot Loader (first-load terminal sequence) ── */
-function makeBootLines(darkMode) {
-  return [
-    { prompt: '$', text: './boot --portfolio',         kind: 'cmd' },
-    { prompt: '>', text: 'loading assets',              kind: 'task', status: '✓' },
-    { prompt: '>', text: 'mounting react@19',           kind: 'task', status: '✓' },
-    { prompt: '>', text: 'compiling styles',            kind: 'task', status: '✓' },
-    { prompt: '>', text: `theme: ${darkMode ? 'dark' : 'light'} mode`, kind: 'task', status: '⚡' },
-    { prompt: '$', text: 'launch portfolio',            kind: 'cmd' },
-  ];
+/* ── Staggered letter reveal ── */
+function LetterReveal({ text, baseDelay = 0, step = 0.045 }) {
+  return (
+    <>
+      {text.split('').map((ch, i) => (
+        <span
+          key={i}
+          className="letter"
+          style={{ animationDelay: `${baseDelay + i * step}s` }}
+        >
+          {ch === ' ' ? ' ' : ch}
+        </span>
+      ))}
+    </>
+  );
 }
 
-function BootLoader({ darkMode, onDone }) {
-  const reduced = useRef(
-    typeof window !== 'undefined' &&
-    window.matchMedia &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  ).current;
+/* ── Scroll progress bar ── */
+function ScrollProgress() {
+  const [p, setP] = useState(0);
 
-  const lines = useRef(makeBootLines(darkMode)).current;
-  const totalChars = useRef(
-    lines.reduce((sum, l) => sum + l.text.length, 0)
-  ).current;
-
-  const [step, setStep] = useState(0);   // index of line currently typing
-  const [typed, setTyped] = useState(0); // chars typed on current line
-  const [exiting, setExiting] = useState(false);
-
-  // Typewriter timeline
   useEffect(() => {
-    if (step >= lines.length) {
-      const t = setTimeout(() => setExiting(true), reduced ? 200 : 480);
-      return () => clearTimeout(t);
-    }
-    const line = lines[step];
-    if (typed < line.text.length) {
-      const speed = reduced ? 0 : (line.kind === 'cmd' ? 34 : 22) + Math.random() * 22;
-      const t = setTimeout(() => setTyped(c => c + 1), speed);
-      return () => clearTimeout(t);
-    }
-    // Line finished typing — brief pause, then advance
-    const t = setTimeout(() => { setStep(s => s + 1); setTyped(0); }, reduced ? 0 : 200);
-    return () => clearTimeout(t);
-  }, [step, typed, lines, reduced]);
+    const onScroll = () => {
+      const h = document.documentElement;
+      const max = h.scrollHeight - h.clientHeight;
+      setP(max > 0 ? h.scrollTop / max : 0);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
-  // Fade-out → unmount (timeout matches CSS transition)
+  return <div className="scroll-progress" style={{ transform: `scaleX(${p})` }} />;
+}
+
+/* ── Side rail — fixed section tracker ── */
+const RAIL_SECTIONS = [
+  { id: 'top',      label: 'home' },
+  { id: 'about',    label: 'about' },
+  { id: 'skills',   label: 'stack' },
+  { id: 'projects', label: 'work' },
+  { id: 'contact',  label: 'contact' },
+];
+
+function SideRail() {
+  const [active, setActive] = useState('top');
+
   useEffect(() => {
-    if (!exiting) return;
-    const t = setTimeout(onDone, 650);
-    return () => clearTimeout(t);
-  }, [exiting, onDone]);
-
-  const completedChars =
-    lines.slice(0, step).reduce((sum, l) => sum + l.text.length, 0) + typed;
-  const pct = step >= lines.length
-    ? 100
-    : Math.round((completedChars / totalChars) * 100);
-
-  const renderLine = (line, idx, isCurrent) => {
-    const shown   = isCurrent ? line.text.slice(0, typed) : line.text;
-    const typing  = isCurrent && typed < line.text.length;
-    const finished = !typing;
-    return (
-      <div className={`boot-line boot-line--${line.kind}`} key={idx}>
-        <span className="boot-prompt">{line.prompt}</span>
-        <span className="boot-text">{shown}</span>
-        {isCurrent && <span className="boot-cursor" />}
-        {line.kind === 'task' && finished && (
-          <>
-            <span className="boot-leader" />
-            <span className={`boot-status${line.status === '⚡' ? ' boot-status--bolt' : ''}`}>
-              {line.status}
-            </span>
-          </>
-        )}
-      </div>
+    const observer = new IntersectionObserver(
+      entries => entries.forEach(e => { if (e.isIntersecting) setActive(e.target.id); }),
+      { rootMargin: '-45% 0px -45% 0px' }
     );
-  };
+    RAIL_SECTIONS.forEach(({ id }) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <div className={`boot-loader${exiting ? ' boot-loader--exiting' : ''}`} aria-hidden="true">
-      <div className="boot-terminal">
-        <div className="boot-bar">
-          <span className="t-dot t-dot--r" />
-          <span className="t-dot t-dot--y" />
-          <span className="t-dot t-dot--g" />
-          <span className="boot-bar-title">nav@portfolio:~/boot</span>
-        </div>
-        <div className="boot-body">
-          {lines.map((line, idx) => {
-            if (idx > step) return null;
-            return renderLine(line, idx, idx === step);
-          })}
-          <div className="boot-progress">
-            <div className="boot-progress-track">
-              <div className="boot-progress-fill" style={{ width: `${pct}%` }} />
-            </div>
-            <span className="boot-progress-pct">{pct}%</span>
-          </div>
-        </div>
-      </div>
+    <nav className="side-rail" aria-label="Section navigation">
+      {RAIL_SECTIONS.map(({ id, label }, i) => (
+        <a
+          key={id}
+          href={`#${id}`}
+          className={`rail-item${active === id ? ' rail-item--active' : ''}`}
+        >
+          <span className="rail-index">0{i + 1}</span>
+          <span className="rail-tick" />
+          <span className="rail-label">{label}</span>
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+/* ── Numbered section header ── */
+function SectionHeader({ num, title }) {
+  return (
+    <div className="section-head reveal">
+      <span className="section-num">{num}</span>
+      <h2 className="section-title">{title}</h2>
+      <span className="section-rule" />
     </div>
   );
 }
 
 /* ── App ── */
 function App() {
+  const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const [dir, setDir] = useState('right');
@@ -925,37 +383,22 @@ function App() {
     const stored = localStorage.getItem('theme');
     return stored ? stored === 'dark' : true;
   });
-  const [transition, setTransition] = useState(null); // 'to-dark' | 'to-light' | null
-  const [toggleActivating, setToggleActivating] = useState(false);
-  const [booting, setBooting] = useState(true);
-
-  // Lock scroll while the boot loader is on screen
-  useEffect(() => {
-    if (!booting) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, [booting]);
 
   const toggleTheme = () => {
-    if (transition) return;
-    const mode = darkMode ? 'to-light' : 'to-dark';
-    setToggleActivating(true);
-    setTimeout(() => setToggleActivating(false), 600);
-    setTransition(mode);
-  };
-
-  const handleTransitionThemeChange = useCallback(() => {
     setDarkMode(prev => {
       const next = !prev;
       localStorage.setItem('theme', next ? 'dark' : 'light');
       return next;
     });
-  }, []);
+  };
 
-  const handleTransitionComplete = useCallback(() => {
-    setTransition(null);
-  }, []);
+  // Lock scroll while loading
+  useEffect(() => {
+    if (!loading) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [loading]);
 
   useEffect(() => {
     fetch('/stats.json')
@@ -964,38 +407,14 @@ function App() {
       .catch(() => {});
   }, []);
 
-  // Contact form
-  const formRef = useRef(null);
-  const [formData, setFormData] = useState({ from_name: '', from_email: '', subject: '', message: '' });
-  const [formStatus, setFormStatus] = useState('idle'); // 'idle' | 'sending' | 'success' | 'error'
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setFormStatus('sending');
-    try {
-      await emailjs.sendForm(EJS_SERVICE_ID, EJS_TEMPLATE_ID, formRef.current, EJS_PUBLIC_KEY);
-      setFormData({ from_name: '', from_email: '', subject: '', message: '' });
-      setFormStatus('flying');
-      setTimeout(() => {
-        setFormStatus('success');
-        setTimeout(() => setFormStatus('idle'), 5000);
-      }, 1600);
-    } catch {
-      setFormStatus('error');
-      setTimeout(() => setFormStatus('idle'), 4000);
-    }
-  };
-
-  const handleField = (field) => (e) => setFormData(f => ({ ...f, [field]: e.target.value }));
-
-  useScrollReveal();
+  useScrollReveal(!loading);
 
   const handleNavClick = () => setMenuOpen(false);
 
   const next = () => { setDir('right'); setActiveIdx(i => (i + 1) % PROJECTS.length); };
   const prev = () => { setDir('left');  setActiveIdx(i => (i - 1 + PROJECTS.length) % PROJECTS.length); };
 
-  // Keyboard navigation
+  // Keyboard navigation for the carousel
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'ArrowRight') { setDir('right'); setActiveIdx(i => (i + 1) % PROJECTS.length); }
@@ -1005,7 +424,6 @@ function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Project card slot calculation
   const getSlot = (i) => {
     const n = PROJECTS.length;
     const diff = ((i - activeIdx) % n + n) % n;
@@ -1041,56 +459,71 @@ function App() {
 
   return (
     <div className={`portfolio${darkMode ? '' : ' light-mode'}`}>
-      {booting && <BootLoader darkMode={darkMode} onDone={() => setBooting(false)} />}
+      {loading && <Loader onDone={() => setLoading(false)} />}
       <CursorTrail />
-      {transition && (
-        <SciFiTransition
-          mode={transition}
-          onThemeChange={handleTransitionThemeChange}
-          onComplete={handleTransitionComplete}
-        />
-      )}
-      <ThemeToggle darkMode={darkMode} onToggle={toggleTheme} activating={toggleActivating} />
+      <ScrollProgress />
+      <SideRail />
+
       <nav className="nav">
-        <div className="nav-logo">NR</div>
+        <a className="nav-logo" href="#top" aria-label="Home">&lt;NR /&gt;</a>
         <ul className={`nav-links${menuOpen ? ' nav-links--open' : ''}`}>
           <li><a href="#about" onClick={handleNavClick}>About</a></li>
           <li><a href="#skills" onClick={handleNavClick}>Tech Stack</a></li>
           <li><a href="#projects" onClick={handleNavClick}>Projects</a></li>
           <li><a href="#contact" onClick={handleNavClick}>Contact</a></li>
         </ul>
-        <button
-          className={`burger${menuOpen ? ' burger--open' : ''}`}
-          onClick={() => setMenuOpen(o => !o)}
-          aria-label="Toggle menu"
-        >
-          <span /><span /><span />
-        </button>
+        <div className="nav-actions">
+          <ThemeToggle darkMode={darkMode} onToggle={toggleTheme} />
+          <button
+            className={`burger${menuOpen ? ' burger--open' : ''}`}
+            onClick={() => setMenuOpen(o => !o)}
+            aria-label="Toggle menu"
+          >
+            <span /><span /><span />
+          </button>
+        </div>
       </nav>
 
       {/* Hero */}
-      <section className="hero">
+      <section className="hero" id="top">
+        <span className="hero-ghost" aria-hidden="true">&lt;NR/&gt;</span>
         <div className="hero-content">
-          <p className="hero-greeting">Hi, I'm</p>
-          <h1 className="hero-name">Navendra Ramdhan</h1>
+          <p className="hero-greeting">{"// hello world, I'm"}</p>
+          <h1 className="hero-name">
+            {!loading && <LetterReveal text="Navendra Ramdhan" baseDelay={0.1} />}
+          </h1>
           <h2 className="hero-title">
-            <TypeOnce text="Front End Software Engineer" speed={55} />
+            {!loading && <TypeOnce text="Front End Software Engineer" speed={55} />}
           </h2>
           <p className="hero-sub">I build clean, performant web experiences.</p>
           <div className="hero-buttons">
             <a href="#projects" className="btn btn-primary">View My Work</a>
             <a href="#contact" className="btn btn-outline">Get In Touch</a>
           </div>
+          <div className="hero-socials">
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="GitHub" title="GitHub">
+              <FiGithub />
+            </a>
+            <a href={LINKEDIN_URL} target="_blank" rel="noreferrer" aria-label="LinkedIn" title="LinkedIn">
+              <FiLinkedin />
+            </a>
+            <a href={MAILTO} aria-label="Email" title="Email me">
+              <FiMail />
+            </a>
+          </div>
         </div>
-        <div className="hero-blob" />
+        <a href="#about" className="scroll-cue" aria-label="Scroll to About section">
+          <span className="scroll-cue-text">scroll</span>
+          <span className="scroll-cue-line" />
+        </a>
       </section>
 
       {/* About */}
-      <section className="section" id="about">
-        <h2 className="section-title reveal">About Me</h2>
+      <section className="section" id="about" data-ghost="01">
+        <SectionHeader num="01" title="About Me" />
         <div className="about-grid reveal" style={{ transitionDelay: '0.12s' }}>
           <div className="about-avatar">
-            <img src="/profile.jpeg" alt="Navendra Ramdhan" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
+            <img src="/profile.jpeg" alt="Navendra Ramdhan" />
           </div>
           <div className="about-terminal">
             <div className="terminal-bar">
@@ -1146,44 +579,35 @@ function App() {
       </section>
 
       {/* Tech Stack */}
-      <section className="section section-alt" id="skills">
-        <h2 className="section-title reveal">Tech Stack</h2>
-        <div className="techstack-grid">
-          {[
-            { label: 'HTML',       icon: <SiHtml5      color="#e34f26" /> },
-            { label: 'CSS',        icon: <SiCss        color="#1572b6" /> },
-            { label: 'JavaScript', icon: <SiJavascript color="#f7df1e" /> },
-            { label: 'TypeScript', icon: <SiTypescript color="#3178c6" /> },
-            { label: 'React',      icon: <SiReact      color="#61dafb" /> },
-            { label: 'Next.js',    icon: <SiNextdotjs  color="#ffffff" /> },
-            { label: 'Redux',      icon: <SiRedux      color="#764abc" /> },
-            { label: 'Node.js',    icon: <SiNodedotjs  color="#3c873a" /> },
-          ].map(({ label, icon }, i) => (
-            <div
-              className="techstack-item reveal"
-              key={label}
-              style={{ transitionDelay: `${i * 0.07}s` }}
-            >
-              <span className="techstack-icon" style={{ animationDelay: `${i * 0.22}s` }}>{icon}</span>
-              <ScrambleLabel text={label} />
+      <section className="section section-alt" id="skills" data-ghost="02">
+        <SectionHeader num="02" title="Tech Stack" />
+        <div className="marquee reveal" style={{ transitionDelay: '0.1s' }}>
+          {[false, true].map((reverse) => (
+            <div className={`marquee-row${reverse ? ' marquee-row--reverse' : ''}`} key={reverse ? 'rev' : 'fwd'}>
+              <div className="marquee-inner">
+                {[...STACK, ...STACK].map(({ label, icon }, i) => (
+                  <div className="marquee-item" key={`${label}-${i}`}>
+                    <span className="techstack-icon">{icon}</span>
+                    <ScrambleLabel text={label} />
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
       </section>
 
       {/* Projects — Carousel */}
-      <section className="section" id="projects">
-        <h2 className="section-title reveal">Projects</h2>
+      <section className="section" id="projects" data-ghost="03">
+        <SectionHeader num="03" title="Projects" />
 
         <div className="carousel-outer reveal" style={{ transitionDelay: '0.1s' }}>
-          {/* Prev button */}
           <button className="carousel-btn carousel-btn--prev" onClick={prev} aria-label="Previous project">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
 
-          {/* Track */}
           <div className="carousel-track" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             {PROJECTS.map(({ title, desc, color, label, link, image }, i) => {
               const slot = getSlot(i);
@@ -1205,17 +629,9 @@ function App() {
                     <div className="project-thumb project-thumb--img" style={{ borderBottom: `1px solid ${color}44` }}>
                       <img src={image} alt={title} className="project-thumb-img" />
                       <div className="project-thumb-scanline" />
-                      <div className="project-thumb-shine" />
                     </div>
                   ) : (
                     <div className="project-thumb" style={{ background: `linear-gradient(135deg, ${color}22, ${color}44)`, borderBottom: `1px solid ${color}44` }}>
-                      <div className="project-thumb-icon" style={{ color }}>
-                        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="3" width="18" height="18" rx="2" />
-                          <circle cx="8.5" cy="8.5" r="1.5" />
-                          <polyline points="21 15 16 10 5 21" />
-                        </svg>
-                      </div>
                       <span className="project-thumb-label" style={{ color }}>{label}</span>
                     </div>
                   )}
@@ -1231,7 +647,7 @@ function App() {
                         className="carousel-visit-btn"
                         style={{ color, borderColor: `${color}77` }}
                       >
-                        Visit Project ↗
+                        Visit Project <FiArrowUpRight />
                       </a>
                     )}
                   </div>
@@ -1240,7 +656,6 @@ function App() {
             })}
           </div>
 
-          {/* Next button */}
           <button className="carousel-btn carousel-btn--next" onClick={next} aria-label="Next project">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="9 18 15 12 9 6" />
@@ -1248,7 +663,6 @@ function App() {
           </button>
         </div>
 
-        {/* Dot indicators */}
         <div className="carousel-dots reveal" style={{ transitionDelay: '0.2s' }}>
           {PROJECTS.map(({ color }, i) => (
             <button
@@ -1263,91 +677,40 @@ function App() {
       </section>
 
       {/* Contact */}
-      <section className="section section-alt" id="contact">
-        <h2 className="section-title reveal">Get In Touch</h2>
+      <section className="section section-alt" id="contact" data-ghost="04">
+        <SectionHeader num="04" title="Get In Touch" />
         <div className="contact-wrapper reveal" style={{ transitionDelay: '0.15s' }}>
           <p className="contact-sub">
             I'm currently open to new opportunities. Whether you have a question or just
             want to say hi, my inbox is always open!
           </p>
 
-          {formStatus === 'flying' && <LetterFly />}
-
-          {formStatus === 'success' ? (
-            <div className="form-feedback form-feedback--success">
-                <div className="success-icon-wrap">
-                  <svg className="success-check" width="56" height="56" viewBox="0 0 52 52" fill="none">
-                    <circle className="success-circle" cx="26" cy="26" r="24" stroke="#2dc96e" strokeWidth="2.5" />
-                    <polyline className="success-tick" points="14,26 22,34 38,18" stroke="#2dc96e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <div className="success-ring" />
-                </div>
-                <h3 className="success-title">Message sent!</h3>
-                <p>Thanks for reaching out — I'll get back to you soon.</p>
-              </div>
-          ) : (
-            <form className="contact-form" ref={formRef} onSubmit={handleSubmit}>
-              <div className="form-row">
-                <input
-                  type="text"
-                  name="from_name"
-                  placeholder="Your Name"
-                  value={formData.from_name}
-                  onChange={handleField('from_name')}
-                  required
-                  disabled={formStatus === 'sending'}
-                />
-                <input
-                  type="email"
-                  name="from_email"
-                  placeholder="Your Email"
-                  value={formData.from_email}
-                  onChange={handleField('from_email')}
-                  required
-                  disabled={formStatus === 'sending'}
-                />
-              </div>
-              <input
-                type="text"
-                name="subject"
-                placeholder="Subject"
-                value={formData.subject}
-                onChange={handleField('subject')}
-                disabled={formStatus === 'sending'}
-              />
-              <textarea
-                name="message"
-                placeholder="Your Message"
-                rows={5}
-                value={formData.message}
-                onChange={handleField('message')}
-                required
-                disabled={formStatus === 'sending'}
-              />
-
-              {formStatus === 'error' && (
-                <p className="form-error">Something went wrong — please try again.</p>
-              )}
-
-              <button
-                type="submit"
-                className={`btn btn-primary${formStatus === 'sending' ? ' btn--sending' : ''}`}
-                disabled={formStatus === 'sending'}
-              >
-                {formStatus === 'sending' ? (
-                  <><span className="btn-spinner" /> Sending…</>
-                ) : 'Send Message'}
-              </button>
-            </form>
-          )}
+          <div className="contact-actions">
+            <a href={MAILTO} className="contact-card contact-card--email">
+              <span className="contact-card-icon"><FiMail /></span>
+              <span className="contact-card-label">Email Me</span>
+              <span className="contact-card-detail">{EMAIL}</span>
+            </a>
+            <a href={LINKEDIN_URL} target="_blank" rel="noreferrer" className="contact-card contact-card--linkedin">
+              <span className="contact-card-icon"><FiLinkedin /></span>
+              <span className="contact-card-label">LinkedIn</span>
+              <span className="contact-card-detail">navendra-ramdhan</span>
+            </a>
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="contact-card contact-card--github">
+              <span className="contact-card-icon"><FiGithub /></span>
+              <span className="contact-card-label">GitHub</span>
+              <span className="contact-card-detail">navv-r</span>
+            </a>
+          </div>
         </div>
       </section>
 
       <footer className="footer">
-        <p>Designed & Built by Navendra Ramdhan &mdash; {new Date().getFullYear()}</p>
+        <p>Designed &amp; Built by Navendra Ramdhan &mdash; {new Date().getFullYear()}</p>
         <div className="footer-links">
-          <a href="https://github.com/navv-r" target="_blank" rel="noreferrer">GitHub</a>
-          <a href="https://linkedin.com" target="_blank" rel="noreferrer">LinkedIn</a>
+          <a href={GITHUB_URL} target="_blank" rel="noreferrer">GitHub</a>
+          <a href={LINKEDIN_URL} target="_blank" rel="noreferrer">LinkedIn</a>
+          <a href={MAILTO}>Email</a>
         </div>
       </footer>
     </div>
