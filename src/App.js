@@ -12,6 +12,13 @@ const LINKEDIN_URL = 'https://www.linkedin.com/in/navendra-ramdhan/';
 const GITHUB_URL   = 'https://github.com/navv-r';
 const MAILTO       = `mailto:${EMAIL}?subject=${encodeURIComponent("Hi Navendra — let's connect")}`;
 
+/* ── Contact channels — rgb triples drive each card's accent ── */
+const CHANNELS = [
+  { label: 'Email',    detail: EMAIL,              href: MAILTO,       external: false, rgb: 'var(--sage-rgb)',   icon: <FiMail /> },
+  { label: 'LinkedIn', detail: 'navendra-ramdhan', href: LINKEDIN_URL, external: true,  rgb: 'var(--cobalt-rgb)', icon: <FiLinkedin /> },
+  { label: 'GitHub',   detail: 'navv-r',           href: GITHUB_URL,   external: true,  rgb: '140, 150, 160',     icon: <FiGithub /> },
+];
+
 /* ── Project data ── */
 const PROJECTS = [
   {
@@ -56,20 +63,25 @@ const PROJECTS = [
   },
 ];
 
-/* ── Tech stack data ── */
-const STACK = [
-  { label: 'HTML',       icon: <SiHtml5      color="#e34f26" /> },
-  { label: 'CSS',        icon: <SiCss        color="#1572b6" /> },
-  { label: 'JavaScript', icon: <SiJavascript color="#f7df1e" /> },
-  { label: 'TypeScript', icon: <SiTypescript color="#3178c6" /> },
-  { label: 'React',      icon: <SiReact      color="#61dafb" /> },
-  { label: 'Next.js',    icon: <SiNextdotjs  className="icon-nextjs" /> },
-  { label: 'Redux',      icon: <SiRedux      color="#764abc" /> },
-  { label: 'Node.js',    icon: <SiNodedotjs  color="#3c873a" /> },
+/* ── Tech stack data — one orbit per planet, Kepler-style periods ──
+   radius: fraction of the system size · start: initial angle ·
+   rgb: planet/trail tint · moon/ringed: extra celestial flair */
+const STACK_PLANETS = [
+  { label: 'HTML',       radius: 0.14,  size: 0.8,  start: 40,  incline: 3,  rgb: '227, 79, 38',   icon: <SiHtml5      color="#e34f26" /> },
+  { label: 'CSS',        radius: 0.185, size: 0.85, start: 160, incline: -2, rgb: '21, 114, 182',  icon: <SiCss        color="#1572b6" /> },
+  { label: 'JavaScript', radius: 0.23,  size: 1,    start: 280, incline: 4,  rgb: '247, 223, 30',  icon: <SiJavascript color="#f7df1e" /> },
+  { label: 'TypeScript', radius: 0.275, size: 0.95, start: 80,  incline: -3, rgb: '49, 120, 198',  icon: <SiTypescript color="#3178c6" /> },
+  { label: 'React',      radius: 0.355, size: 1.15, start: 210, incline: 2,  rgb: '97, 218, 251',  icon: <SiReact      color="#61dafb" />, moon: true },
+  { label: 'Redux',      radius: 0.4,   size: 0.88, start: 330, incline: -4, rgb: '118, 74, 188',  icon: <SiRedux      color="#764abc" /> },
+  { label: 'Next.js',    radius: 0.445, size: 1.05, start: 120, incline: 3,  rgb: '140, 150, 160', icon: <SiNextdotjs  className="icon-nextjs" />, ringed: true },
+  { label: 'Node.js',    radius: 0.49,  size: 1,    start: 255, incline: -2, rgb: '60, 135, 58',   icon: <SiNodedotjs  color="#3c873a" /> },
 ];
 
-/* ── 2s Loading screen ── */
-const LOAD_MS = 2000;
+/* Kepler's third law, roughly: T ∝ r^1.5 — closer planets orbit faster */
+const orbitDuration = (radius) => Math.round(190 * Math.pow(radius, 1.5));
+
+/* ── 1.5s Loading screen ── */
+const LOAD_MS = 1500;
 
 function Loader({ onDone }) {
   const [pct, setPct] = useState(0);
@@ -189,38 +201,81 @@ function TypeOnce({ text: fullText, speed = 60 }) {
   );
 }
 
-/* ── Scramble label (hover) ── */
-const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&';
+/* ── Tech stack solar system — tilted 3D plane with mouse parallax,
+   one orbit per planet, sun-lit terminators, belt, moon, ring ── */
+function OrbitStack() {
+  const orbitRef = useRef(null);
 
-function ScrambleLabel({ text }) {
-  const [display, setDisplay] = useState(text);
-  const frameRef = useRef(null);
-
-  const scramble = () => {
-    let iter = 0;
-    const totalFrames = text.length * 4;
-    cancelAnimationFrame(frameRef.current);
-    const tick = () => {
-      setDisplay(
-        text.split('').map((char, i) =>
-          i < Math.floor(iter / 4)
-            ? char
-            : SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)]
-        ).join('')
-      );
-      iter++;
-      if (iter <= totalFrames) frameRef.current = requestAnimationFrame(tick);
-      else setDisplay(text);
-    };
-    frameRef.current = requestAnimationFrame(tick);
+  const handleParallax = (e) => {
+    const el = orbitRef.current;
+    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const rect = el.getBoundingClientRect();
+    const nx = (e.clientX - rect.left) / rect.width - 0.5;
+    const ny = (e.clientY - rect.top) / rect.height - 0.5;
+    el.style.setProperty('--my', `${(nx * 7).toFixed(2)}deg`);
+    el.style.setProperty('--mx', `${(-ny * 5).toFixed(2)}deg`);
   };
 
-  const reset = () => { cancelAnimationFrame(frameRef.current); setDisplay(text); };
+  const resetParallax = () => {
+    const el = orbitRef.current;
+    if (!el) return;
+    el.style.setProperty('--my', '0deg');
+    el.style.setProperty('--mx', '0deg');
+  };
 
   return (
-    <span className="techstack-label" onMouseEnter={scramble} onMouseLeave={reset}>
-      {display}
-    </span>
+    <div
+      className="orbit reveal"
+      style={{ transitionDelay: '0.1s' }}
+      ref={orbitRef}
+      onMouseMove={handleParallax}
+      onMouseLeave={resetParallax}
+    >
+      <div className="orbit-plane">
+        <div className="orbit-glow" />
+        <div className="orbit-belt" />
+        <div className="orbit-core">
+          <span className="orbit-core-mark">&lt;/&gt;</span>
+        </div>
+        {STACK_PLANETS.map(({ label, icon, size, radius, start, incline, rgb, moon, ringed }) => (
+          <div
+            key={label}
+            className="orbit-incline"
+            style={{
+              '--dur': `${orbitDuration(radius)}s`,
+              '--a': `${start}deg`,
+              '--r': radius,
+              '--s': size,
+              '--c': rgb,
+              '--i': `${incline}deg`,
+            }}
+          >
+            <div className="orbit-ring-track" />
+            <div className="orbit-ring">
+              <div className="orbit-item">
+                <div className="orbit-unrot">
+                  <div className="orbit-counter">
+                    <div className="orbit-billboard">
+                      <div className={`orbit-chip${ringed ? ' orbit-chip--ringed' : ''}`}>
+                        <span className="orbit-icon">{icon}</span>
+                        <span className="orbit-shade" />
+                        <span className="orbit-label">{label}</span>
+                      </div>
+                      {moon && (
+                        <div className="orbit-moon-spin">
+                          <span className="orbit-moon" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="orbit-flare" />
+    </div>
   );
 }
 
@@ -285,20 +340,47 @@ function ThemeToggle({ darkMode, onToggle }) {
   );
 }
 
-/* ── Staggered letter reveal ── */
-function LetterReveal({ text, baseDelay = 0, step = 0.045 }) {
+/* ── Decode-in name: glyphs scramble, then lock in left-to-right ── */
+const DECODE_GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>/{}[]#$%&*+=?';
+
+function DecodeName({ text, charDelay = 70, holdDelay = 250 }) {
+  const [letters, setLetters] = useState(() =>
+    text.split('').map(ch => ({ ch: ch === ' ' ? ' ' : ' ', locked: ch === ' ' }))
+  );
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setLetters(text.split('').map(ch => ({ ch, locked: true })));
+      setDone(true);
+      return;
+    }
+    const scrambleWindow = charDelay * 6;
+    let raf;
+    const start = performance.now();
+    const tick = (now) => {
+      const elapsed = now - start - holdDelay;
+      let allLocked = true;
+      setLetters(text.split('').map((ch, i) => {
+        if (ch === ' ') return { ch: ' ', locked: true };
+        if (elapsed >= i * charDelay) return { ch, locked: true };
+        allLocked = false;
+        if (elapsed < i * charDelay - scrambleWindow) return { ch: ' ', locked: false };
+        return { ch: DECODE_GLYPHS[Math.floor(Math.random() * DECODE_GLYPHS.length)], locked: false };
+      }));
+      if (allLocked) setDone(true);
+      else raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [text, charDelay, holdDelay]);
+
   return (
-    <>
-      {text.split('').map((ch, i) => (
-        <span
-          key={i}
-          className="letter"
-          style={{ animationDelay: `${baseDelay + i * step}s` }}
-        >
-          {ch === ' ' ? ' ' : ch}
-        </span>
+    <span className={`decode-name${done ? ' decode-name--glitch' : ''}`} data-text={text}>
+      {letters.map(({ ch, locked }, i) => (
+        <span key={i} className={locked ? 'dl dl--locked' : 'dl'}>{ch}</span>
       ))}
-    </>
+    </span>
   );
 }
 
@@ -372,12 +454,24 @@ function SectionHeader({ num, title }) {
   );
 }
 
+/* ── Vertical side header for split sections ── */
+function SectionSide({ num, title }) {
+  return (
+    <div className="section-side reveal">
+      <span className="section-num">{num}</span>
+      <h2 className="section-title section-title--v">{title}</h2>
+      <span className="section-rule-v" />
+    </div>
+  );
+}
+
 /* ── App ── */
 function App() {
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
-  const [dir, setDir] = useState('right');
+  const [shutter, setShutter] = useState({ key: 0, color: '' });
+  const switchingRef = useRef(false);
   const [commitCount, setCommitCount] = useState(null);
   const [darkMode, setDarkMode] = useState(() => {
     const stored = localStorage.getItem('theme');
@@ -411,51 +505,65 @@ function App() {
 
   const handleNavClick = () => setMenuOpen(false);
 
-  const next = () => { setDir('right'); setActiveIdx(i => (i + 1) % PROJECTS.length); };
-  const prev = () => { setDir('left');  setActiveIdx(i => (i - 1 + PROJECTS.length) % PROJECTS.length); };
+  // Switch projects behind a color shutter sweep
+  const switchTo = (i) => {
+    const n = PROJECTS.length;
+    const idx = ((i % n) + n) % n;
+    if (idx === activeIdx || switchingRef.current) return;
+    switchingRef.current = true;
+    setShutter(s => ({ key: s.key + 1, color: PROJECTS[idx].color }));
+    setTimeout(() => {
+      setActiveIdx(idx);
+      switchingRef.current = false;
+    }, 300);
+  };
 
-  // Keyboard navigation for the carousel
+  // Keyboard navigation for the showcase
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'ArrowRight') { setDir('right'); setActiveIdx(i => (i + 1) % PROJECTS.length); }
-      if (e.key === 'ArrowLeft')  { setDir('left');  setActiveIdx(i => (i - 1 + PROJECTS.length) % PROJECTS.length); }
+      if (e.key === 'ArrowRight') switchTo(activeIdx + 1);
+      if (e.key === 'ArrowLeft')  switchTo(activeIdx - 1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  });
 
-  const getSlot = (i) => {
-    const n = PROJECTS.length;
-    const diff = ((i - activeIdx) % n + n) % n;
-    if (diff === 0) return 'center';
-    if (diff === 1) return 'right';
-    if (diff === n - 1) return 'left';
-    return dir === 'right' ? 'hidden-left' : 'hidden-right';
-  };
-
-  // Touch swipe for carousel
+  // Touch swipe on the showcase stage
   const touchStartX = useRef(null);
   const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
   const onTouchEnd = (e) => {
     if (touchStartX.current === null) return;
     const delta = touchStartX.current - e.changedTouches[0].clientX;
-    if (Math.abs(delta) > 40) { delta > 0 ? next() : prev(); }
+    if (Math.abs(delta) > 40) switchTo(delta > 0 ? activeIdx + 1 : activeIdx - 1);
     touchStartX.current = null;
   };
 
   const handleTilt = (e) => {
     const card = e.currentTarget;
     const rect = card.getBoundingClientRect();
-    const rotX = ((e.clientY - rect.top - rect.height / 2) / rect.height) * -8;
-    const rotY = ((e.clientX - rect.left - rect.width / 2) / rect.width) * 8;
+    const rotX = ((e.clientY - rect.top - rect.height / 2) / rect.height) * -4;
+    const rotY = ((e.clientX - rect.left - rect.width / 2) / rect.width) * 4;
     card.style.transition = 'transform 0.05s, box-shadow 0.25s';
-    card.style.transform = `perspective(900px) rotateX(${rotX}deg) rotateY(${rotY}deg) translateY(-6px) scale(1.01)`;
+    card.style.transform = `perspective(1200px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
   };
 
   const resetTilt = (e) => {
     e.currentTarget.style.transition = 'transform 0.6s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s';
     e.currentTarget.style.transform = '';
   };
+
+  const activeProject = PROJECTS[activeIdx];
+
+  // Magnetic pull on the contact CTA
+  const magnetMove = (e) => {
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left - r.width / 2) * 0.25;
+    const y = (e.clientY - r.top - r.height / 2) * 0.35;
+    el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+  };
+
+  const magnetReset = (e) => { e.currentTarget.style.transform = ''; };
 
   return (
     <div className={`portfolio${darkMode ? '' : ' light-mode'}`}>
@@ -490,7 +598,7 @@ function App() {
         <div className="hero-content">
           <p className="hero-greeting">{"// hello world, I'm"}</p>
           <h1 className="hero-name">
-            {!loading && <LetterReveal text="Navendra Ramdhan" baseDelay={0.1} />}
+            {!loading && <DecodeName text="Navendra Ramdhan" />}
           </h1>
           <h2 className="hero-title">
             {!loading && <TypeOnce text="Front End Software Engineer" speed={55} />}
@@ -519,188 +627,214 @@ function App() {
       </section>
 
       {/* About */}
-      <section className="section" id="about" data-ghost="01">
-        <SectionHeader num="01" title="About Me" />
-        <div className="about-grid reveal" style={{ transitionDelay: '0.12s' }}>
-          <div className="about-avatar">
-            <img src="/profile.jpeg" alt="Navendra Ramdhan" />
-          </div>
-          <div className="about-terminal">
-            <div className="terminal-bar">
-              <span className="t-dot t-dot--r" />
-              <span className="t-dot t-dot--y" />
-              <span className="t-dot t-dot--g" />
-              <span className="terminal-bar-title">nav@portfolio:~/about</span>
-            </div>
-            <div className="terminal-body">
-              <div className="t-line t-line--1">
-                <span className="t-prompt">$</span>
-                <span className="t-cmd">whoami</span>
+      <section className="section section--split" id="about" data-ghost="01">
+        <SectionSide num="01" title="About Me" />
+        <div className="section-content">
+          <div className="bento reveal" style={{ transitionDelay: '0.12s' }}>
+            <div className="bento-col">
+              <div className="bento-tile bento-tile--avatar">
+                <img src="/profile.jpeg" alt="Navendra Ramdhan" />
               </div>
-              <div className="t-output t-line--2">
-                Front-end developer based in Queens, NY — passionate about building cool, interactive web experiences and bringing creative ideas to life through code.
-              </div>
-              <div className="t-line t-line--3">
-                <span className="t-prompt">$</span>
-                <span className="t-cmd">cat interests.txt</span>
-              </div>
-              <div className="t-output t-line--4">
-                Musician at heart — I play Dholak and Tassa, instruments rooted in my cultural heritage. That same rhythm and creativity drives everything I build.
-              </div>
-              <div className="t-line t-line--5">
-                <span className="t-prompt">$</span>
-                <span className="t-cmd">cat passion.txt</span>
-              </div>
-              <div className="t-output t-line--6">
-                Deeply passionate about crafting seamless web experiences and pushing boundaries with AI integration — whether that's smart interfaces, generative features, or tools that make users feel like they're living in the future.
-              </div>
-              <div className="t-line t-line--7">
-                <span className="t-cursor" />
+              <div className="bento-tile bento-tile--status">
+                <div className="status-row">
+                  <span className="status-dot" />
+                  <span>open_to_work</span>
+                </div>
+                <div className="status-loc">{'// based in Queens, NY'}</div>
               </div>
             </div>
-            <div className="about-stats">
-              <div className="stat">
+            <div className="about-terminal">
+              <div className="terminal-bar">
+                <span className="t-dot t-dot--r" />
+                <span className="t-dot t-dot--y" />
+                <span className="t-dot t-dot--g" />
+                <span className="terminal-bar-title">nav@portfolio:~/about</span>
+              </div>
+              <div className="terminal-body">
+                <div className="t-line t-line--1">
+                  <span className="t-prompt">$</span>
+                  <span className="t-cmd">whoami</span>
+                </div>
+                <div className="t-output t-line--2">
+                  Front-end developer based in Queens, NY — passionate about building cool, interactive web experiences and bringing creative ideas to life through code.
+                </div>
+                <div className="t-line t-line--3">
+                  <span className="t-prompt">$</span>
+                  <span className="t-cmd">cat passion.txt</span>
+                </div>
+                <div className="t-output t-line--4">
+                  Deeply passionate about crafting seamless web experiences and pushing boundaries with AI integration — whether that's smart interfaces, generative features, or tools that make users feel like they're living in the future.
+                </div>
+                <div className="t-line t-line--5">
+                  <span className="t-cursor" />
+                </div>
+              </div>
+            </div>
+            <div className="bento-stats">
+              <div className="bento-tile stat-tile">
                 <span className="stat-num"><CountUp target={1} /></span>
-                <span>Years Exp.</span>
+                <span className="stat-label">Years Exp.</span>
               </div>
-              <div className="stat">
+              <div className="bento-tile stat-tile">
                 <span className="stat-num"><CountUp target={5} /></span>
-                <span>Projects</span>
+                <span className="stat-label">Projects</span>
               </div>
-              <div className="stat">
+              <div className="bento-tile stat-tile">
                 <span className="stat-num">
                   {commitCount !== null ? <CountUp target={commitCount} /> : '...'}
                 </span>
-                <span>Commits Pushed</span>
+                <span className="stat-label">Commits Pushed</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Tech Stack */}
-      <section className="section section-alt" id="skills" data-ghost="02">
+      {/* Tech Stack — full-bleed space scene */}
+      <section className="section section--space" id="skills">
+        <div className="space-stars" />
+        <div className="space-stars space-stars--far" />
+        <div className="space-nebula" />
+        <div className="orbit-comet" />
+        <div className="orbit-comet orbit-comet--2" />
         <SectionHeader num="02" title="Tech Stack" />
-        <div className="marquee reveal" style={{ transitionDelay: '0.1s' }}>
-          {[false, true].map((reverse) => (
-            <div className={`marquee-row${reverse ? ' marquee-row--reverse' : ''}`} key={reverse ? 'rev' : 'fwd'}>
-              <div className="marquee-inner">
-                {[...STACK, ...STACK].map(({ label, icon }, i) => (
-                  <div className="marquee-item" key={`${label}-${i}`}>
-                    <span className="techstack-icon">{icon}</span>
-                    <ScrambleLabel text={label} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <OrbitStack />
       </section>
 
-      {/* Projects — Carousel */}
+      {/* Projects — Showcase */}
       <section className="section" id="projects" data-ghost="03">
         <SectionHeader num="03" title="Projects" />
 
-        <div className="carousel-outer reveal" style={{ transitionDelay: '0.1s' }}>
-          <button className="carousel-btn carousel-btn--prev" onClick={prev} aria-label="Previous project">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
+        <div className="showcase reveal" style={{ transitionDelay: '0.1s' }}>
+          <nav className="showcase-list" aria-label="Project list">
+            {PROJECTS.map(({ title, label, color }, i) => (
+              <button
+                key={title}
+                className={`showcase-item${i === activeIdx ? ' showcase-item--active' : ''}`}
+                style={{ '--pc': color }}
+                onClick={() => switchTo(i)}
+              >
+                <span className="showcase-item-num">0{i + 1}</span>
+                <span className="showcase-item-name">{label}</span>
+                <span className="showcase-item-line" />
+              </button>
+            ))}
+            <div className="showcase-count">
+              <span>0{activeIdx + 1}</span> / 0{PROJECTS.length}
+            </div>
+          </nav>
 
-          <div className="carousel-track" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-            {PROJECTS.map(({ title, desc, color, label, link, image }, i) => {
-              const slot = getSlot(i);
-              return (
-                <div
-                  key={title}
-                  className="carousel-card"
-                  data-slot={slot}
-                  style={{ '--card-color': color }}
-                  onClick={
-                    slot === 'left'   ? prev :
-                    slot === 'right'  ? next :
-                    undefined
-                  }
-                  onMouseMove={slot === 'center' ? handleTilt : undefined}
-                  onMouseLeave={slot === 'center' ? resetTilt : undefined}
-                >
-                  {image ? (
-                    <div className="project-thumb project-thumb--img" style={{ borderBottom: `1px solid ${color}44` }}>
-                      <img src={image} alt={title} className="project-thumb-img" />
-                      <div className="project-thumb-scanline" />
-                    </div>
-                  ) : (
-                    <div className="project-thumb" style={{ background: `linear-gradient(135deg, ${color}22, ${color}44)`, borderBottom: `1px solid ${color}44` }}>
-                      <span className="project-thumb-label" style={{ color }}>{label}</span>
-                    </div>
-                  )}
-                  <div className="project-body" style={{ borderTop: `2px solid ${color}55` }}>
-                    <h3 style={{ color }}>{title}</h3>
-                    <p>{desc}</p>
-
-                    {slot === 'center' && link && (
-                      <a
-                        href={link}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="carousel-visit-btn"
-                        style={{ color, borderColor: `${color}77` }}
-                      >
-                        Visit Project <FiArrowUpRight />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          <div
+            className="showcase-stage"
+            style={{ '--pc': activeProject.color }}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+            onMouseMove={handleTilt}
+            onMouseLeave={resetTilt}
+          >
+            {shutter.key > 0 && (
+              <span
+                key={shutter.key}
+                className="showcase-shutter"
+                style={{ background: `linear-gradient(120deg, ${shutter.color}, var(--cobalt))` }}
+              />
+            )}
+            <article className="showcase-card" key={activeIdx}>
+              <div className="showcase-thumb">
+                <img src={activeProject.image} alt={activeProject.title} />
+                <span className="showcase-scan" />
+                <span className="showcase-ghost">0{activeIdx + 1}</span>
+              </div>
+              <div className="showcase-body">
+                <span className="showcase-tag">{activeProject.label}</span>
+                <h3 className="showcase-title">{activeProject.title}</h3>
+                <p className="showcase-desc">{activeProject.desc}</p>
+                {activeProject.link && (
+                  <a
+                    href={activeProject.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="showcase-link"
+                  >
+                    Visit Project <FiArrowUpRight />
+                  </a>
+                )}
+              </div>
+            </article>
           </div>
-
-          <button className="carousel-btn carousel-btn--next" onClick={next} aria-label="Next project">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="carousel-dots reveal" style={{ transitionDelay: '0.2s' }}>
-          {PROJECTS.map(({ color }, i) => (
-            <button
-              key={i}
-              className={`carousel-dot${i === activeIdx ? ' carousel-dot--active' : ''}`}
-              onClick={() => { setDir(i > activeIdx ? 'right' : 'left'); setActiveIdx(i); }}
-              style={i === activeIdx ? { background: color, boxShadow: `0 0 12px ${color}99` } : {}}
-              aria-label={`Go to project ${i + 1}`}
-            />
-          ))}
         </div>
       </section>
 
       {/* Contact */}
-      <section className="section section-alt" id="contact" data-ghost="04">
-        <SectionHeader num="04" title="Get In Touch" />
-        <div className="contact-wrapper reveal" style={{ transitionDelay: '0.15s' }}>
-          <p className="contact-sub">
-            I'm currently open to new opportunities. Whether you have a question or just
-            want to say hi, my inbox is always open!
-          </p>
+      <section className="section section-alt section--split section--flip" id="contact" data-ghost="04">
+        <SectionSide num="04" title="Get In Touch" />
+        <div className="section-content">
+          <div className="contact-grid reveal" style={{ transitionDelay: '0.15s' }}>
 
-          <div className="contact-actions">
-            <a href={MAILTO} className="contact-card contact-card--email">
-              <span className="contact-card-icon"><FiMail /></span>
-              <span className="contact-card-label">Email Me</span>
-              <span className="contact-card-detail">{EMAIL}</span>
-            </a>
-            <a href={LINKEDIN_URL} target="_blank" rel="noreferrer" className="contact-card contact-card--linkedin">
-              <span className="contact-card-icon"><FiLinkedin /></span>
-              <span className="contact-card-label">LinkedIn</span>
-              <span className="contact-card-detail">navendra-ramdhan</span>
-            </a>
-            <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="contact-card contact-card--github">
-              <span className="contact-card-icon"><FiGithub /></span>
-              <span className="contact-card-label">GitHub</span>
-              <span className="contact-card-detail">navv-r</span>
-            </a>
+            {/* Uplink terminal */}
+            <div className="uplink">
+              <div className="terminal-bar">
+                <span className="t-dot t-dot--r" />
+                <span className="t-dot t-dot--y" />
+                <span className="t-dot t-dot--g" />
+                <span className="terminal-bar-title">nav@portfolio:~/contact</span>
+              </div>
+              <div className="uplink-body">
+                <div className="uplink-line">
+                  <span className="t-prompt">$</span>{' '}
+                  <span className="uplink-cmd">./initiate_contact.sh</span>
+                  <span className="uplink-caret" />
+                </div>
+                <div className="uplink-status">
+                  <span className="uplink-scan"><span className="uplink-blip" /></span>
+                  <div className="uplink-readout">
+                    <span>signal_strength: <b>STRONG</b></span>
+                    <span>status: <b className="ok">OPEN_TO_WORK</b></span>
+                    <span>avg_response_time: <b>&lt; 24h</b></span>
+                  </div>
+                </div>
+                <p className="uplink-note">
+                  I'm currently open to new opportunities. Whether you have a question or just
+                  want to say hi, my inbox is always open!
+                </p>
+                <a
+                  href={MAILTO}
+                  className="btn btn-primary uplink-cta"
+                  onMouseMove={magnetMove}
+                  onMouseLeave={magnetReset}
+                >
+                  Send Transmission
+                </a>
+              </div>
+            </div>
+
+            {/* Channels */}
+            <div className="channels">
+              {CHANNELS.map(({ label, detail, href, external, rgb, icon }) => (
+                <a
+                  key={label}
+                  href={href}
+                  className="channel"
+                  style={{ '--cc': rgb }}
+                  {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}
+                >
+                  <span className="channel-border" aria-hidden="true" />
+                  <span className="channel-icon">
+                    {icon}
+                    <span className="channel-ping" />
+                  </span>
+                  <span className="channel-info">
+                    <span className="channel-label">{label}</span>
+                    <span className="channel-detail">{detail}</span>
+                  </span>
+                  <span className="channel-status">
+                    <span className="channel-dot" />
+                    ONLINE
+                  </span>
+                  <FiArrowUpRight className="channel-arrow" />
+                </a>
+              ))}
+            </div>
           </div>
         </div>
       </section>
