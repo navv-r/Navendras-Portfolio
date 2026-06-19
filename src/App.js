@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { FiMail, FiGithub, FiLinkedin, FiSun, FiMoon, FiArrowUpRight } from 'react-icons/fi';
 import {
   SiHtml5, SiCss, SiJavascript, SiTypescript,
   SiReact, SiNextdotjs, SiRedux, SiNodedotjs,
 } from 'react-icons/si';
-import { FiMail, FiGithub, FiLinkedin, FiSun, FiMoon, FiArrowUpRight } from 'react-icons/fi';
 import './App.css';
 
 /* ── Links ── */
@@ -63,22 +63,82 @@ const PROJECTS = [
   },
 ];
 
-/* ── Tech stack data — one orbit per planet, Kepler-style periods ──
-   radius: fraction of the system size · start: initial angle ·
-   rgb: planet/trail tint · moon/ringed: extra celestial flair */
-const STACK_PLANETS = [
-  { label: 'HTML',       radius: 0.14,  size: 0.8,  start: 40,  incline: 3,  rgb: '227, 79, 38',   icon: <SiHtml5      color="#e34f26" /> },
-  { label: 'CSS',        radius: 0.185, size: 0.85, start: 160, incline: -2, rgb: '21, 114, 182',  icon: <SiCss        color="#1572b6" /> },
-  { label: 'JavaScript', radius: 0.23,  size: 1,    start: 280, incline: 4,  rgb: '247, 223, 30',  icon: <SiJavascript color="#f7df1e" /> },
-  { label: 'TypeScript', radius: 0.275, size: 0.95, start: 80,  incline: -3, rgb: '49, 120, 198',  icon: <SiTypescript color="#3178c6" /> },
-  { label: 'React',      radius: 0.355, size: 1.15, start: 210, incline: 2,  rgb: '97, 218, 251',  icon: <SiReact      color="#61dafb" />, moon: true },
-  { label: 'Redux',      radius: 0.4,   size: 0.88, start: 330, incline: -4, rgb: '118, 74, 188',  icon: <SiRedux      color="#764abc" /> },
-  { label: 'Next.js',    radius: 0.445, size: 1.05, start: 120, incline: 3,  rgb: '140, 150, 160', icon: <SiNextdotjs  className="icon-nextjs" />, ringed: true },
-  { label: 'Node.js',    radius: 0.49,  size: 1,    start: 255, incline: -2, rgb: '60, 135, 58',   icon: <SiNodedotjs  color="#3c873a" /> },
+/* ── Tech stack — rgb triple drives each card's accent/glow ── */
+const TECH = [
+  { label: 'HTML',       rgb: '227, 79, 38',   icon: <SiHtml5 /> },
+  { label: 'CSS',        rgb: '33, 150, 243',  icon: <SiCss /> },
+  { label: 'JavaScript', rgb: '240, 219, 79',  icon: <SiJavascript /> },
+  { label: 'TypeScript', rgb: '49, 120, 198',  icon: <SiTypescript /> },
+  { label: 'React',      rgb: '97, 218, 251',  icon: <SiReact /> },
+  { label: 'Redux',      rgb: '124, 92, 196',  icon: <SiRedux /> },
+  { label: 'Next.js',    rgb: '231, 237, 235', icon: <SiNextdotjs /> },
+  { label: 'Node.js',    rgb: '92, 170, 75',   icon: <SiNodedotjs /> },
 ];
 
-/* Kepler's third law, roughly: T ∝ r^1.5 — closer planets orbit faster */
-const orbitDuration = (radius) => Math.round(190 * Math.pow(radius, 1.5));
+/* number of stacked slices that give each icon its 3D thickness */
+const ICON_DEPTH = 8;
+
+/* ── Tech stack grid — extruded 3D icons that sway toward the cursor ── */
+function TechGrid() {
+  const gridRef = useRef(null);
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const grid = gridRef.current;
+    if (!grid) return;
+
+    let raf = null, mx = 0, my = 0;
+    const clamp = (v) => Math.max(-1, Math.min(1, v));
+
+    const apply = () => {
+      raf = null;
+      grid.querySelectorAll('.tech-card').forEach((card) => {
+        const r = card.getBoundingClientRect();
+        const dx = (mx - (r.left + r.width / 2)) / (window.innerWidth / 2);
+        const dy = (my - (r.top + r.height / 2)) / (window.innerHeight / 2);
+        card.style.setProperty('--ry', `${(clamp(dx) * 32).toFixed(1)}deg`);
+        card.style.setProperty('--rx', `${(clamp(dy) * -32).toFixed(1)}deg`);
+      });
+    };
+
+    const onMove = (e) => {
+      mx = e.clientX; my = e.clientY;
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+    const onLeave = () => grid.querySelectorAll('.tech-card').forEach((c) => {
+      c.style.setProperty('--rx', '0deg');
+      c.style.setProperty('--ry', '0deg');
+    });
+
+    window.addEventListener('pointermove', onMove, { passive: true });
+    document.addEventListener('mouseleave', onLeave);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      document.removeEventListener('mouseleave', onLeave);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  return (
+    <div ref={gridRef} className="techgrid reveal" style={{ transitionDelay: '0.1s' }}>
+      {TECH.map(({ label, rgb, icon }) => (
+        <article key={label} className="tech-card" style={{ '--c': rgb }}>
+          <div className="tech-card-inner">
+            <span className="tech-glow" />
+            <span className="tech-ico">
+              <span className="tech-ico-3d">
+                {Array.from({ length: ICON_DEPTH }).map((_, i) => (
+                  <span className="ico-layer" style={{ '--i': i }} key={i}>{icon}</span>
+                ))}
+              </span>
+            </span>
+            <span className="tech-name">{label}</span>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
 
 /* ── 1.5s Loading screen ── */
 const LOAD_MS = 1500;
@@ -198,84 +258,6 @@ function TypeOnce({ text: fullText, speed = 60 }) {
       {displayed}
       {!done && <span className="tw-cursor">|</span>}
     </span>
-  );
-}
-
-/* ── Tech stack solar system — tilted 3D plane with mouse parallax,
-   one orbit per planet, sun-lit terminators, belt, moon, ring ── */
-function OrbitStack() {
-  const orbitRef = useRef(null);
-
-  const handleParallax = (e) => {
-    const el = orbitRef.current;
-    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const rect = el.getBoundingClientRect();
-    const nx = (e.clientX - rect.left) / rect.width - 0.5;
-    const ny = (e.clientY - rect.top) / rect.height - 0.5;
-    el.style.setProperty('--my', `${(nx * 7).toFixed(2)}deg`);
-    el.style.setProperty('--mx', `${(-ny * 5).toFixed(2)}deg`);
-  };
-
-  const resetParallax = () => {
-    const el = orbitRef.current;
-    if (!el) return;
-    el.style.setProperty('--my', '0deg');
-    el.style.setProperty('--mx', '0deg');
-  };
-
-  return (
-    <div
-      className="orbit reveal"
-      style={{ transitionDelay: '0.1s' }}
-      ref={orbitRef}
-      onMouseMove={handleParallax}
-      onMouseLeave={resetParallax}
-    >
-      <div className="orbit-plane">
-        <div className="orbit-glow" />
-        <div className="orbit-belt" />
-        <div className="orbit-core">
-          <span className="orbit-core-mark">&lt;/&gt;</span>
-        </div>
-        {STACK_PLANETS.map(({ label, icon, size, radius, start, incline, rgb, moon, ringed }) => (
-          <div
-            key={label}
-            className="orbit-incline"
-            style={{
-              '--dur': `${orbitDuration(radius)}s`,
-              '--a': `${start}deg`,
-              '--r': radius,
-              '--s': size,
-              '--c': rgb,
-              '--i': `${incline}deg`,
-            }}
-          >
-            <div className="orbit-ring-track" />
-            <div className="orbit-ring">
-              <div className="orbit-item">
-                <div className="orbit-unrot">
-                  <div className="orbit-counter">
-                    <div className="orbit-billboard">
-                      <div className={`orbit-chip${ringed ? ' orbit-chip--ringed' : ''}`}>
-                        <span className="orbit-icon">{icon}</span>
-                        <span className="orbit-shade" />
-                        <span className="orbit-label">{label}</span>
-                      </div>
-                      {moon && (
-                        <div className="orbit-moon-spin">
-                          <span className="orbit-moon" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="orbit-flare" />
-    </div>
   );
 }
 
@@ -690,7 +672,7 @@ function App() {
         </div>
       </section>
 
-      {/* Tech Stack — full-bleed space scene */}
+      {/* Tech Stack — 3D animated icon grid on a space backdrop */}
       <section className="section section--space" id="skills">
         <div className="space-stars" />
         <div className="space-stars space-stars--far" />
@@ -698,7 +680,7 @@ function App() {
         <div className="orbit-comet" />
         <div className="orbit-comet orbit-comet--2" />
         <SectionHeader num="02" title="Tech Stack" />
-        <OrbitStack />
+        <TechGrid />
       </section>
 
       {/* Projects — Showcase */}
