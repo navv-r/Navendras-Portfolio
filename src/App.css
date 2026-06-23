@@ -44,7 +44,9 @@ body {
 
 a { color: inherit; text-decoration: none; }
 
-html, body { max-width: 100%; overflow-x: hidden; }
+/* overflow-x: clip (not hidden) keeps html/body from becoming a scroll
+   container, so position: sticky descendants (e.g. the helix) still work. */
+html, body { max-width: 100%; overflow-x: clip; }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 6px; }
@@ -453,6 +455,21 @@ html, body { max-width: 100%; overflow-x: hidden; }
   min-height: 1.1em;
   white-space: nowrap;
   cursor: default;
+}
+
+/* 3D typed name: the heading becomes a wide canvas banner */
+.hero-name--3d {
+  width: 100%;
+  max-width: 680px;
+  height: clamp(90px, 16vw, 170px);
+  margin-left: -0.4rem;       /* nudge to optical-left like the other lines */
+}
+
+.hero-name-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
 }
 
 /* Decode-in name: scrambling glyphs lock in left-to-right */
@@ -1229,121 +1246,32 @@ html, body { max-width: 100%; overflow-x: hidden; }
 }
 
 /* ════════════════════════════════════════
-   TECH STACK — 3D animated icon grid
+   TECH STACK — DNA double-helix
    ════════════════════════════════════════ */
-.techgrid {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr); /* even 4 × 2 */
-  gap: clamp(0.9rem, 2vw, 1.6rem);
-  max-width: 920px;
-  margin: 0 auto;
-  perspective: 900px;
+.section--helix {
+  overflow: visible;
+  padding-bottom: 0;
 }
 
-.tech-card {
+/* tall stage: the canvas is as long as the section, so the entire helix
+   renders down the page length and you scroll past all of it */
+.helix-stage {
   position: relative;
-  border-radius: 18px;
-  transform-style: preserve-3d;
+  height: 360vh;
 }
 
-.tech-card-inner {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1.1rem;
-  padding: clamp(1.5rem, 3.2vw, 2.3rem) 1rem;
-  border-radius: 18px;
-  background:
-    linear-gradient(160deg, rgba(var(--c), 0.10), rgba(255, 255, 255, 0.015)),
-    var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.38);
-  transform-style: preserve-3d;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-  overflow: hidden;
-}
-
-/* soft sheen + accent wash near the top */
-.tech-glow {
+.helix-canvas {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(125% 80% at 30% -10%, rgba(255, 255, 255, 0.10), transparent 55%);
-  pointer-events: none;
-}
-
-/* icon wrapper — floats above the card surface */
-.tech-ico {
-  display: block;
-  line-height: 0;
-  font-size: clamp(2.5rem, 7vw, 3.4rem);
-  transform: translateZ(40px);
-  transform-style: preserve-3d;
-  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.55));
-  animation: tech-float 4.5s ease-in-out infinite;
-}
-
-.tech-card:nth-child(2n) .tech-ico { animation-delay: -1.3s; }
-.tech-card:nth-child(3n) .tech-ico { animation-delay: -2.6s; }
-.tech-card:nth-child(4n) .tech-ico { animation-delay: -0.7s; }
-
-@keyframes tech-float {
-  0%, 100% { transform: translateZ(40px) translateY(0); }
-  50%      { transform: translateZ(40px) translateY(-9px); }
-}
-
-/* the extruded 3D icon — sways toward the cursor (--rx/--ry set per card) */
-.tech-ico-3d {
-  position: relative;
-  display: block;
-  width: 1em;
-  height: 1em;
-  transform-style: preserve-3d;
-  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-  transition: transform 0.18s ease-out;
-}
-
-/* stacked layers fake real depth: front face is brightest, deeper
-   slices step back in Z and darken — visible as the cursor turns it */
-.ico-layer {
-  position: absolute;
-  inset: 0;
-  color: rgb(var(--c));
-  transform: translateZ(calc(var(--i) * -1.5px));
-  filter: brightness(calc(1 - var(--i) * 0.11));
-}
-
-.ico-layer:first-child {
-  filter: drop-shadow(0 0 16px rgba(var(--c), 0.45));
-}
-
-.ico-layer svg {
-  display: block;
   width: 100%;
   height: 100%;
+  display: block;
+  touch-action: none;
+  outline: none;
 }
 
-.tech-name {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.84rem;
-  letter-spacing: 0.02em;
-  color: var(--text);
-  transform: translateZ(20px);
-}
-
-/* hover: card lifts with an accent border + glow, icon pops further out */
-.tech-card:hover .tech-card-inner {
-  border-color: rgb(var(--c));
-  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.55), 0 0 30px rgba(var(--c), 0.32);
-}
-
-.tech-card:hover .tech-ico {
-  animation-play-state: paused;
-  transform: translateZ(58px) scale(1.07);
+@media (prefers-reduced-motion: reduce) {
+  .helix-hint { animation: none; opacity: 0.6; }
 }
 
 /* ════════════════════════════════════════
@@ -1606,7 +1534,19 @@ html, body { max-width: 100%; overflow-x: hidden; }
   grid-template-columns: 1.15fr 1fr;
   gap: 1.5rem;
   max-width: 1000px;
+  margin-inline: auto;
   align-items: stretch;
+}
+
+/* Center the whole contact block on the page: symmetric side gutters
+   keep the vertical "04 / Get In Touch" rail on the right while the
+   content column stays centered in the viewport. */
+@media (min-width: 901px) {
+  #contact.section--flip {
+    grid-template-columns: minmax(110px, 170px) 1fr minmax(110px, 170px);
+  }
+  #contact .section-content { grid-column: 2; }
+  #contact .section-side { grid-column: 3; }
 }
 
 /* Uplink terminal panel */
@@ -2013,7 +1953,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
 @media (max-width: 768px) {
   .nav { padding: 0 5%; }
 
-  .techgrid { grid-template-columns: repeat(2, 1fr); max-width: 460px; }
+  .helix-stage { height: 320vh; }
 
   .hero-ghost { font-size: clamp(5rem, 18vw, 9rem); right: -4%; }
   .scroll-cue { display: none; }
@@ -2134,7 +2074,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
   .bento-stats { grid-template-columns: 1fr; }
 
-  .techgrid { gap: 0.8rem; }
+  .helix-stage { height: 300vh; }
 
   .showcase-thumb { height: 170px; }
   .showcase-item { font-size: 0.8rem; padding: 0.5rem 0.7rem; }

@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Environment, Lightformer, Text3D, Center } from '@react-three/drei';
+import * as THREE from 'three';
+import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 import { FiMail, FiGithub, FiLinkedin, FiSun, FiMoon, FiArrowUpRight } from 'react-icons/fi';
 import {
   SiHtml5, SiCss, SiJavascript, SiTypescript,
@@ -63,80 +68,364 @@ const PROJECTS = [
   },
 ];
 
-/* ── Tech stack — rgb triple drives each card's accent/glow ── */
+/* Standard B-DNA-like ball-and-stick double helix: ~10.5 base pairs per turn,
+   antiparallel backbones offset across the minor groove. */
+const BP        = 80;                    // number of base pairs
+const RISE      = 0.34;                  // vertical rise per base pair
+const RADIUS    = 2.0;                   // backbone radius
+const R_INNER   = 0.7;                   // where the bases meet near the axis
+const TWIST     = (2 * Math.PI) / 10.5;  // twist per base pair
+const PHASE_B   = 2.4;                   // 2nd strand offset (~137°) → real grooves
+const DNA_H     = (BP - 1) * RISE;       // total helix height
+
+const BASE_COLORS = { A: '#46c06a', T: '#e5544b', G: '#4a8cf0', C: '#e8b53e' };
+const BASE_PAIRS  = [['A', 'T'], ['G', 'C'], ['T', 'A'], ['C', 'G']];
+const BACKBONE    = '#aab6c6';
+
+/* Each tech icon is extruded into a real 3D mesh and spaced along the helix */
 const TECH = [
-  { label: 'HTML',       rgb: '227, 79, 38',   icon: <SiHtml5 /> },
-  { label: 'CSS',        rgb: '33, 150, 243',  icon: <SiCss /> },
-  { label: 'JavaScript', rgb: '240, 219, 79',  icon: <SiJavascript /> },
-  { label: 'TypeScript', rgb: '49, 120, 198',  icon: <SiTypescript /> },
-  { label: 'React',      rgb: '97, 218, 251',  icon: <SiReact /> },
-  { label: 'Redux',      rgb: '124, 92, 196',  icon: <SiRedux /> },
-  { label: 'Next.js',    rgb: '231, 237, 235', icon: <SiNextdotjs /> },
-  { label: 'Node.js',    rgb: '92, 170, 75',   icon: <SiNodedotjs /> },
+  { label: 'HTML',       color: '#e34f26', icon: <SiHtml5 /> },
+  { label: 'CSS',        color: '#2196f3', icon: <SiCss /> },
+  { label: 'JavaScript', color: '#f0db4f', icon: <SiJavascript /> },
+  { label: 'TypeScript', color: '#3178c6', icon: <SiTypescript /> },
+  { label: 'React',      color: '#61dafb', icon: <SiReact /> },
+  { label: 'Redux',      color: '#7c5cc4', icon: <SiRedux /> },
+  { label: 'Next.js',    color: '#e7edeb', icon: <SiNextdotjs /> },
+  { label: 'Node.js',    color: '#5caa4b', icon: <SiNodedotjs /> },
 ];
 
-/* number of stacked slices that give each icon its 3D thickness */
-const ICON_DEPTH = 8;
+/* Render a react-icon's SVG → extruded 3D geometry, centred & Y-flipped,
+   normalised to ~1.2 units tall. */
+function makeIconGeometry(iconEl) {
+  const svg = renderToStaticMarkup(iconEl);
+  const parsed = new SVGLoader().parse(svg);
+  const shapes = [];
+  parsed.paths.forEach((p) => SVGLoader.createShapes(p).forEach((s) => shapes.push(s)));
+  const geo = new THREE.ExtrudeGeometry(shapes, {
+    depth: 11, bevelEnabled: true, bevelThickness: 1.6, bevelSize: 1.0, bevelSegments: 3,
+  });
+  geo.computeBoundingBox();
+  const box = geo.boundingBox;
+  const size = new THREE.Vector3(); box.getSize(size);
+  const center = new THREE.Vector3(); box.getCenter(center);
+  const s = 1.0 / Math.max(size.x, size.y);     // a touch smaller
+  geo.translate(-center.x, -center.y, -center.z);
+  geo.scale(s, -s, s);                       // SVG y is down → flip
+  geo.computeVertexNormals();
+  return geo;
+}
 
-/* ── Tech stack grid — extruded 3D icons that sway toward the cursor ── */
-function TechGrid() {
-  const gridRef = useRef(null);
+const ICON_GEOMETRIES = TECH.map((t) => ({ ...t, geo: makeIconGeometry(t.icon) }));
+
+/* Build the whole molecule as two InstancedMeshes (atoms + bonds) so the entire
+   ball-and-stick model draws in two calls. */
+function buildDNA() {
+  const up = new THREE.Vector3(0, 1, 0);
+  const dummy = new THREE.Object3D();
+  const atoms = [];   // { pos, r, color }
+  const bonds = [];   // { a, b, r, color }
+  const y0 = -DNA_H / 2;
+  const bb = new THREE.Color(BACKBONE);
+
+  const pt = (i, phase, radius) => new THREE.Vector3(
+    Math.cos(i * TWIST + phase) * radius,
+    y0 + i * RISE,
+    Math.sin(i * TWIST + phase) * radius,
+  );
+
+  let prevA = null, prevB = null;
+  for (let i = 0; i < BP; i++) {
+    const bbA = pt(i, 0, RADIUS);
+    const bbB = pt(i, PHASE_B, RADIUS);
+    atoms.push({ pos: bbA, r: 0.20, color: bb });
+    atoms.push({ pos: bbB, r: 0.20, color: bb });
+    if (prevA) {
+      bonds.push({ a: prevA, b: bbA, r: 0.075, color: bb });
+      bonds.push({ a: prevB, b: bbB, r: 0.075, color: bb });
+    }
+    prevA = bbA; prevB = bbB;
+
+    const [na, nb] = BASE_PAIRS[i % BASE_PAIRS.length];
+    const cA = new THREE.Color(BASE_COLORS[na]);
+    const cB = new THREE.Color(BASE_COLORS[nb]);
+    const baseA = pt(i, 0, R_INNER);
+    const baseB = pt(i, PHASE_B, R_INNER);
+    atoms.push({ pos: baseA, r: 0.15, color: cA });
+    atoms.push({ pos: baseB, r: 0.15, color: cB });
+    bonds.push({ a: bbA, b: baseA, r: 0.06, color: cA });   // sugar → base
+    bonds.push({ a: bbB, b: baseB, r: 0.06, color: cB });
+    const mid = baseA.clone().add(baseB).multiplyScalar(0.5);
+    bonds.push({ a: baseA, b: mid, r: 0.05, color: cA });   // H-bond, two halves
+    bonds.push({ a: mid, b: baseB, r: 0.05, color: cB });
+  }
+
+  const atomGeo = new THREE.SphereGeometry(1, 20, 20);
+  const atomMat = new THREE.MeshPhysicalMaterial({
+    vertexColors: true, roughness: 0.28, metalness: 0.0,
+    clearcoat: 1, clearcoatRoughness: 0.22, envMapIntensity: 1.15,
+  });
+  const atomMesh = new THREE.InstancedMesh(atomGeo, atomMat, atoms.length);
+  atoms.forEach((a, idx) => {
+    dummy.position.copy(a.pos);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.setScalar(a.r);
+    dummy.updateMatrix();
+    atomMesh.setMatrixAt(idx, dummy.matrix);
+    atomMesh.setColorAt(idx, a.color);
+  });
+  atomMesh.instanceMatrix.needsUpdate = true;
+  atomMesh.instanceColor.needsUpdate = true;
+
+  const bondGeo = new THREE.CylinderGeometry(1, 1, 1, 10);
+  const bondMat = new THREE.MeshPhysicalMaterial({
+    vertexColors: true, roughness: 0.38, metalness: 0.0,
+    clearcoat: 0.7, clearcoatRoughness: 0.35, envMapIntensity: 1.0,
+  });
+  const bondMesh = new THREE.InstancedMesh(bondGeo, bondMat, bonds.length);
+  bonds.forEach((bd, idx) => {
+    const dir = bd.b.clone().sub(bd.a);
+    const len = dir.length();
+    dummy.position.copy(bd.a).addScaledVector(dir, 0.5);
+    dummy.scale.set(bd.r, len, bd.r);
+    dummy.quaternion.setFromUnitVectors(up, dir.normalize());
+    dummy.updateMatrix();
+    bondMesh.setMatrixAt(idx, dummy.matrix);
+    bondMesh.setColorAt(idx, bd.color);
+  });
+  bondMesh.instanceMatrix.needsUpdate = true;
+  bondMesh.instanceColor.needsUpdate = true;
+
+  return { atomMesh, bondMesh };
+}
+
+/* The whole molecule, laid out down its full length. Scroll spins the backbone
+   and reveals each tech icon as you reach its place on the strand. */
+function DNA({ progressRef }) {
+  const { atomMesh, bondMesh } = useMemo(buildDNA, []);
+  const backbone = useRef();
+  const iconRefs = useRef([]);
+  const spin = useRef(0);
+
+  const icons = useMemo(() => {
+    const n = ICON_GEOMETRIES.length;
+    return ICON_GEOMETRIES.map((tech, k) => {
+      const f = n === 1 ? 0 : k / (n - 1);
+      return {
+        ...tech,
+        y: DNA_H / 2 - f * DNA_H,    // first tech at the top, last at the bottom
+        threshold: f,                // scroll fraction where it emerges
+      };
+    });
+  }, []);
+
+  useEffect(() => () => {
+    [atomMesh, bondMesh].forEach((m) => { m.geometry.dispose(); m.material.dispose(); m.dispose(); });
+  }, [atomMesh, bondMesh]);
+
+  useFrame((_, delta) => {
+    const p = progressRef.current || 0;
+    // ease the spin a touch so it feels smooth, not jittery, while scrolling
+    spin.current += (p * Math.PI * 4 - spin.current) * Math.min(1, delta * 6);
+    if (backbone.current) backbone.current.rotation.y = spin.current;
+
+    icons.forEach((m, k) => {
+      const mesh = iconRefs.current[k];
+      if (!mesh) return;
+      const raw = (p - m.threshold + 0.06) / 0.1;
+      const e = Math.max(0, Math.min(1, raw));
+      const es = e * e * (3 - 2 * e);                         // smoothstep
+      mesh.visible = es > 0.01;
+      mesh.material.opacity = es;
+      mesh.scale.setScalar(0.2 + 0.8 * es);                  // grows as it surfaces
+      // emerge: rise out of the helix core toward the viewer, flipping to face you
+      mesh.position.set(0, m.y, -0.8 + es * (RADIUS + 2.2));
+      mesh.rotation.y = (1 - es) * 1.25;                      // edge-on → face-on
+    });
+  });
+
+  return (
+    <group>
+      <group ref={backbone}>
+        <primitive object={atomMesh} />
+        <primitive object={bondMesh} />
+      </group>
+      {icons.map((m, k) => (
+        <mesh
+          key={m.label}
+          ref={(el) => { iconRefs.current[k] = el; }}
+          geometry={m.geo}
+          visible={false}
+        >
+          <meshStandardMaterial
+            color={m.color}
+            emissive={m.color}
+            emissiveIntensity={0.35}
+            metalness={0.55}
+            roughness={0.25}
+            side={THREE.DoubleSide}
+            transparent
+            opacity={0}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/* Orthographic fit: scale the camera so the entire helix height maps onto the
+   full (tall) canvas, then scrolling the page reveals it top→bottom. */
+function FitHelix() {
+  const { camera, size, invalidate } = useThree();
+  useEffect(() => {
+    camera.zoom = size.height / (DNA_H * 1.06);
+    camera.position.set(0, 0, 60);
+    camera.updateProjectionMatrix();
+    invalidate();
+  }, [camera, size, invalidate]);
+  return null;
+}
+
+/* The canvas is as tall as the section, so the full-length helix renders down
+   the page and you simply scroll past the entire thing. */
+function TechHelix() {
+  const stageRef = useRef(null);
+  const progressRef = useRef(0);
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const grid = gridRef.current;
-    if (!grid) return;
-
-    let raf = null, mx = 0, my = 0;
-    const clamp = (v) => Math.max(-1, Math.min(1, v));
-
-    const apply = () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    let raf = null;
+    const update = () => {
       raf = null;
-      grid.querySelectorAll('.tech-card').forEach((card) => {
-        const r = card.getBoundingClientRect();
-        const dx = (mx - (r.left + r.width / 2)) / (window.innerWidth / 2);
-        const dy = (my - (r.top + r.height / 2)) / (window.innerHeight / 2);
-        card.style.setProperty('--ry', `${(clamp(dx) * 32).toFixed(1)}deg`);
-        card.style.setProperty('--rx', `${(clamp(dy) * -32).toFixed(1)}deg`);
-      });
+      const rect = stage.getBoundingClientRect();
+      const dist = rect.height - window.innerHeight;
+      const p = dist <= 0 ? 0 : -rect.top / dist;
+      progressRef.current = Math.max(0, Math.min(1, p));
     };
-
-    const onMove = (e) => {
-      mx = e.clientX; my = e.clientY;
-      if (!raf) raf = requestAnimationFrame(apply);
-    };
-    const onLeave = () => grid.querySelectorAll('.tech-card').forEach((c) => {
-      c.style.setProperty('--rx', '0deg');
-      c.style.setProperty('--ry', '0deg');
-    });
-
-    window.addEventListener('pointermove', onMove, { passive: true });
-    document.addEventListener('mouseleave', onLeave);
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
     return () => {
-      window.removeEventListener('pointermove', onMove);
-      document.removeEventListener('mouseleave', onLeave);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
   }, []);
 
   return (
-    <div ref={gridRef} className="techgrid reveal" style={{ transitionDelay: '0.1s' }}>
-      {TECH.map(({ label, rgb, icon }) => (
-        <article key={label} className="tech-card" style={{ '--c': rgb }}>
-          <div className="tech-card-inner">
-            <span className="tech-glow" />
-            <span className="tech-ico">
-              <span className="tech-ico-3d">
-                {Array.from({ length: ICON_DEPTH }).map((_, i) => (
-                  <span className="ico-layer" style={{ '--i': i }} key={i}>{icon}</span>
-                ))}
-              </span>
-            </span>
-            <span className="tech-name">{label}</span>
-          </div>
-        </article>
-      ))}
+    <div className="helix-stage" ref={stageRef}>
+      <div className="space-stars" />
+      <div className="space-stars space-stars--far" />
+      <div className="space-nebula" />
+      <Canvas
+        className="helix-canvas"
+        orthographic
+        dpr={1}
+        gl={{ antialias: true, alpha: true }}
+        camera={{ position: [0, 0, 60], near: 0.1, far: 400, zoom: 80 }}
+        onCreated={({ gl }) => { gl.toneMappingExposure = 1.35; }}
+      >
+        <ambientLight intensity={0.85} />
+        <hemisphereLight args={['#cfe0ff', '#1a2233', 0.8]} />
+        <directionalLight position={[6, 9, 7]} intensity={3.6} />
+        <directionalLight position={[-7, -2, -4]} intensity={1.1} color="#9fbcff" />
+        <pointLight position={[0, 0, 20]} intensity={120} color="#eaf2ff" />
+        <Environment resolution={256}>
+          <Lightformer intensity={3} position={[0, 4, -6]} scale={[14, 7, 1]} color="#bcd2ff" />
+          <Lightformer intensity={2} position={[-6, 2, 3]} scale={[7, 7, 1]} color="#ffffff" />
+          <Lightformer intensity={1.6} position={[6, -3, 3]} scale={[7, 7, 1]} color="#ffe8cf" />
+        </Environment>
+        <FitHelix />
+        <DNA progressRef={progressRef} />
+      </Canvas>
     </div>
+  );
+}
+
+/* ── 3D name that types itself out like code ── */
+function NameGlyphs({ text }) {
+  const group = useRef();
+  const [count, setCount] = useState(0);
+  const [blink, setBlink] = useState(true);
+  const reduced = useMemo(
+    () => typeof window !== 'undefined' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches, [],
+  );
+
+  useEffect(() => {
+    if (reduced) { setCount(text.length); return; }
+    if (count >= text.length) return;
+    const t = setTimeout(() => setCount((c) => c + 1), 95);
+    return () => clearTimeout(t);
+  }, [count, text.length, reduced]);
+
+  useEffect(() => {
+    const iv = setInterval(() => setBlink((b) => !b), 460);
+    return () => clearInterval(iv);
+  }, []);
+
+  // gentle 3D float
+  useFrame((state) => {
+    const g = group.current;
+    if (!g || reduced) return;
+    const t = state.clock.elapsedTime;
+    g.rotation.y = Math.sin(t * 0.5) * 0.12;
+    g.rotation.x = Math.sin(t * 0.4) * 0.05;
+  });
+
+  const done = count >= text.length;
+  const size = 1.05;
+  const caret = done ? (blink ? '_' : '') : '_';     // blinking code cursor
+  const shown = text.slice(0, count) + caret;
+  const leftX = -text.length * 0.31 * size;           // ≈ centre the final name
+
+  return (
+    <group ref={group}>
+      <group position={[leftX, -size / 2, 0]}>
+        <Text3D
+          font="/fonts/helvetiker_bold.typeface.json"
+          size={size}
+          height={0.35}
+          curveSegments={5}
+          bevelEnabled
+          bevelThickness={0.02}
+          bevelSize={0.016}
+          bevelSegments={2}
+        >
+          {shown}
+          <meshStandardMaterial
+            color="#e6edff"
+            metalness={0.55}
+            roughness={0.22}
+            emissive="#2c4f9e"
+            emissiveIntensity={0.35}
+          />
+        </Text3D>
+      </group>
+    </group>
+  );
+}
+
+function HeroName({ text }) {
+  return (
+    <Canvas
+      className="hero-name-canvas"
+      dpr={[1, 2]}
+      gl={{ alpha: true, antialias: true }}
+      camera={{ position: [0, 0.4, 9], fov: 30 }}
+    >
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[4, 6, 8]} intensity={2.6} />
+      <directionalLight position={[-5, -2, 3]} intensity={0.7} color="#8fb0ff" />
+      <Environment resolution={128}>
+        <Lightformer intensity={2.2} position={[0, 3, -4]} scale={[10, 4, 1]} color="#bcd2ff" />
+        <Lightformer intensity={1.4} position={[-4, 1, 3]} scale={[5, 5, 1]} color="#ffffff" />
+      </Environment>
+      <Suspense fallback={null}>
+        <NameGlyphs text={text} />
+      </Suspense>
+    </Canvas>
   );
 }
 
@@ -579,8 +868,8 @@ function App() {
         <span className="hero-ghost" aria-hidden="true">&lt;NR/&gt;</span>
         <div className="hero-content">
           <p className="hero-greeting">{"// hello world, I'm"}</p>
-          <h1 className="hero-name">
-            {!loading && <DecodeName text="Navendra Ramdhan" />}
+          <h1 className="hero-name hero-name--3d">
+            {!loading && <HeroName text="Navendra Ramdhan" />}
           </h1>
           <h2 className="hero-title">
             {!loading && <TypeOnce text="Front End Software Engineer" speed={55} />}
@@ -672,15 +961,10 @@ function App() {
         </div>
       </section>
 
-      {/* Tech Stack — 3D animated icon grid on a space backdrop */}
-      <section className="section section--space" id="skills">
-        <div className="space-stars" />
-        <div className="space-stars space-stars--far" />
-        <div className="space-nebula" />
-        <div className="orbit-comet" />
-        <div className="orbit-comet orbit-comet--2" />
+      {/* Tech Stack — DNA double-helix the icons descend as you scroll */}
+      <section className="section section--space section--helix" id="skills">
         <SectionHeader num="02" title="Tech Stack" />
-        <TechGrid />
+        <TechHelix />
       </section>
 
       {/* Projects — Showcase */}
