@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Environment, Lightformer, Text3D, Center } from '@react-three/drei';
+import { Environment, Lightformer, Text3D } from '@react-three/drei';
 import * as THREE from 'three';
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 import { FiMail, FiGithub, FiLinkedin, FiSun, FiMoon, FiArrowUpRight } from 'react-icons/fi';
@@ -608,50 +608,6 @@ function ThemeToggle({ darkMode, onToggle }) {
         <FiMoon className="toggle-icon toggle-icon--moon" />
       </span>
     </button>
-  );
-}
-
-/* ── Decode-in name: glyphs scramble, then lock in left-to-right ── */
-const DECODE_GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>/{}[]#$%&*+=?';
-
-function DecodeName({ text, charDelay = 70, holdDelay = 250 }) {
-  const [letters, setLetters] = useState(() =>
-    text.split('').map(ch => ({ ch: ch === ' ' ? ' ' : ' ', locked: ch === ' ' }))
-  );
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setLetters(text.split('').map(ch => ({ ch, locked: true })));
-      setDone(true);
-      return;
-    }
-    const scrambleWindow = charDelay * 6;
-    let raf;
-    const start = performance.now();
-    const tick = (now) => {
-      const elapsed = now - start - holdDelay;
-      let allLocked = true;
-      setLetters(text.split('').map((ch, i) => {
-        if (ch === ' ') return { ch: ' ', locked: true };
-        if (elapsed >= i * charDelay) return { ch, locked: true };
-        allLocked = false;
-        if (elapsed < i * charDelay - scrambleWindow) return { ch: ' ', locked: false };
-        return { ch: DECODE_GLYPHS[Math.floor(Math.random() * DECODE_GLYPHS.length)], locked: false };
-      }));
-      if (allLocked) setDone(true);
-      else raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [text, charDelay, holdDelay]);
-
-  return (
-    <span className={`decode-name${done ? ' decode-name--glitch' : ''}`} data-text={text}>
-      {letters.map(({ ch, locked }, i) => (
-        <span key={i} className={locked ? 'dl dl--locked' : 'dl'}>{ch}</span>
-      ))}
-    </span>
   );
 }
 
