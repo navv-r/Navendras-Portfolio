@@ -1,8 +1,7 @@
-import { render, screen } from '@testing-library/react';
-import App from './App';
+import { PROJECTS, TECH, CHANNELS } from './data/site';
 
-test('renders learn react link', () => {
-  render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+test('site data is populated', () => {
+  expect(PROJECTS.length).toBeGreaterThan(0);
+  expect(TECH.length).toBeGreaterThan(0);
+  expect(CHANNELS.length).toBe(3);
 });
